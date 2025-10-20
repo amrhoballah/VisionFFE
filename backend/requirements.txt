@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+python-multipart
+torch
+torchvision
+transformers
+timm
+pillow
+numpy
+scikit-learn
+python-dotenv
+pinecone
+pinecone[asyncio]
+modal
+boto3
+botocore
+open-clip-torch
