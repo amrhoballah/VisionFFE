@@ -8,10 +8,15 @@ import json
 from pinecone import Pinecone
 from dotenv import load_dotenv
 from image_embedder import ImageEmbedder
-from image_embedder2 import ImageEmbedder2
 from image_embedder3 import ImageEmbedder3
 from image_uploader import ImageUploader
 import boto3
+
+# Authentication imports
+from database import init_database, init_default_data, close_database
+from auth_routes import router as auth_router
+from admin_routes import router as admin_router
+from auth_dependencies import require_search_permission, require_upload_permission, require_stats_permission
 
 
 load_dotenv()
@@ -36,6 +41,12 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 async def lifespan(app: FastAPI):
     """Handles startup and shutdown events cleanly."""
     print("🚀 Starting up...")
+
+    # --- Initialize MongoDB Database ---
+    print("📊 Initializing MongoDB database...")
+    await init_database()
+    await init_default_data()
+    print("✅ MongoDB database initialized")
 
     # --- Initialize Embedder ---
     model_preset = os.getenv("MODEL_PRESET", "newest")
@@ -81,10 +92,19 @@ async def lifespan(app: FastAPI):
         print("✅ Connected to Cloudflare R2")
     except Exception as e:
         print(f"⚠️ Error connecting to R2: {e}")
+    
     # --- Let the app run ---
     yield
+    
+    # --- Cleanup on shutdown ---
+    print("🛑 Shutting down...")
+    await close_database()
 
 app = FastAPI(lifespan=lifespan)
+
+# Include authentication routers
+app.include_router(auth_router)
+app.include_router(admin_router)
 
 @app.get("/")
 async def root(request: Request):
@@ -106,7 +126,12 @@ async def root(request: Request):
     }
 
 @app.post("/api/search")
-async def search_similar(request: Request, file: UploadFile = File(...), top_k: int = 5):
+async def search_similar(
+    request: Request, 
+    file: UploadFile = File(...), 
+    top_k: int = 5,
+    current_user = Depends(require_search_permission)
+):
     embedder = request.app.state.embedder
     pinecone_index = request.app.state.pinecone_index
     if embedder is None:
@@ -147,7 +172,12 @@ async def search_similar(request: Request, file: UploadFile = File(...), top_k: 
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 @app.post("/api/upload")
-async def upload_images(request: Request, files: List[UploadFile] = File(...), metadata: Optional[str] = None):
+async def upload_images(
+    request: Request, 
+    files: List[UploadFile] = File(...), 
+    metadata: Optional[str] = None,
+    current_user = Depends(require_upload_permission)
+):
     try:
         metadata_list = []
         if metadata:
@@ -175,7 +205,10 @@ async def upload_images(request: Request, files: List[UploadFile] = File(...), m
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 @app.get("/api/database/stats")
-async def get_database_stats(request: Request):
+async def get_database_stats(
+    request: Request,
+    current_user = Depends(require_stats_permission)
+):
     embedder = request.app.state.embedder
     pinecone_index = request.app.state.pinecone_index
     if pinecone_index is None:

@@ -15,3 +15,11 @@ modal
 boto3
 botocore
 open-clip-torch
+python-jose[cryptography]
+passlib[bcrypt]
+motor
+pymongo
+pydantic
+pydantic-settings
+email-validator
+beanie

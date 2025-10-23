@@ -9,7 +9,7 @@ MODEL_PRESETS = {
     'best': 'convnextv2_huge.fcmae_ft_in22k_in1k_384',
     'balanced': 'convnextv2_base.fcmae_ft_in22k_in1k_384',
     'fast': 'efficientnet_b3.ra2_in1k',
-    'fastest': 'mobilenetv3_large_100.ra_in1k',
+    'fastest': 'mobilenetv3_small_075.lamb_in1k',
     'semantic': 'vit_base_patch16_clip_224.openai',
     'newest': 'facebook/dinov3-vith16plus-pretrain-lvd1689m',
     'nextbest': 'ViT-H-14::laion2B-s32B-b79K'

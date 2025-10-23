@@ -23,7 +23,16 @@ image = (
             "pinecone[asyncio]",
             "transformers",
             "huggingface-hub",
-            "open-clip-torch"
+            "open-clip-torch",
+            # Authentication dependencies
+            "python-jose[cryptography]",
+            "passlib[bcrypt]",
+            "motor",
+            "pymongo",
+            "pydantic",
+            "pydantic-settings",
+            "email-validator",
+            "beanie"
         ]
     )
     # ✅ Copy everything in your current folder into /root/app
