@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, validator
+from pydantic import BaseModel, EmailStr, field_validator, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 from bson import ObjectId
@@ -11,7 +11,8 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
     
-    @validator('password')
+    @field_validator('password')
+    @classmethod
     def validate_password(cls, v):
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters long')
@@ -30,8 +31,7 @@ class UserResponse(UserBase):
     created_at: datetime
     role_ids: List[str] = []  # MongoDB ObjectIds as strings
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class UserWithRoles(UserResponse):
     roles: List['RoleResponse'] = []
@@ -53,8 +53,7 @@ class RoleResponse(RoleBase):
     created_at: datetime
     permission_ids: List[str] = []  # MongoDB ObjectIds as strings
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Permission schemas
 class PermissionBase(BaseModel):
@@ -76,8 +75,7 @@ class PermissionResponse(PermissionBase):
     id: str  # MongoDB ObjectId as string
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Authentication schemas
 class LoginRequest(BaseModel):
@@ -100,7 +98,8 @@ class PasswordChangeRequest(BaseModel):
     current_password: str
     new_password: str
     
-    @validator('new_password')
+    @field_validator('new_password')
+    @classmethod
     def validate_new_password(cls, v):
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters long')

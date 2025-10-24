@@ -51,7 +51,7 @@ data_volume = modal.Volume.from_name("furniture-data", create_if_missing=True)
     scaledown_window=300,  # replaces old container_idle_timeout
 )
 @modal.asgi_app()
-def fast_api_app():
+def fast_app():
     # ✅ Confirm environment
     print("Current working directory:", os.getcwd())
     print("Files in /root:", os.listdir("/root"))

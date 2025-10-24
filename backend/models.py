@@ -1,6 +1,6 @@
 from beanie import Document, Indexed
-from pydantic import Field, EmailStr
-from typing import List, Optional
+from pydantic import Field, EmailStr, ConfigDict
+from typing import List, Optional, Annotated
 from datetime import datetime
 from bson import ObjectId
 
@@ -12,7 +12,9 @@ class User(Document):
     is_verified: bool = False
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: Optional[datetime] = None
-    role_ids: List[ObjectId] = []
+    role_ids: List[ObjectId] = Field(default_factory=list)
+    
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     
     class Settings:
         name = "users"
@@ -27,7 +29,9 @@ class Role(Document):
     name: Indexed(str, unique=True)
     description: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    permission_ids: List[ObjectId] = []
+    permission_ids: List[ObjectId] = Field(default_factory=list)
+    
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     
     class Settings:
         name = "roles"
@@ -41,6 +45,8 @@ class Permission(Document):
     resource: str
     action: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     
     class Settings:
         name = "permissions"
@@ -57,6 +63,8 @@ class Token(Document):
     is_revoked: bool = False
     created_at: datetime = Field(default_factory=datetime.utcnow)
     user_id: ObjectId
+    
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     
     class Settings:
         name = "tokens"
