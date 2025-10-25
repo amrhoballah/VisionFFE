@@ -21,7 +21,7 @@ class AuthSettings(BaseSettings):
     password_min_length: int = 8
     
     # CORS Settings
-    allowed_origins: list = ["http://localhost:3000", "http://localhost:8080"]
+    allowed_origins: list = ["http://localhost:3000", "http://localhost:8080", "https://vision-ffe.vercel.app"]
     
     model_config = ConfigDict(env_file=".env")
 

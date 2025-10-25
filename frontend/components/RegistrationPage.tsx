@@ -65,11 +65,18 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ onBackToHome, onNav
         const countryCode = countryData[data.location as keyof typeof countryData] || '';
         const fullPhoneNumber = phoneInput && countryCode ? `${countryCode}${phoneInput}` : phoneInput;
 
-        // Extract required fields for backend registration
+        // Extract all fields for backend registration
         const registrationData = {
             username: data.username as string,
             email: data.email as string,
             password: data.password as string,
+            firstName: data.firstName as string,
+            lastName: data.lastName as string,
+            title: title, // Use the state value instead of form data
+            officeName: data.officeName as string || undefined,
+            supplierName: data.supplierName as string || undefined,
+            location: data.location as string,
+            phone: fullPhoneNumber,
         };
 
         try {

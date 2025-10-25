@@ -26,7 +26,7 @@ image = (
             "open-clip-torch",
             # Authentication dependencies
             "python-jose[cryptography]",
-            "passlib[bcrypt]",
+            "passlib[argon2]",
             "motor",
             "pymongo",
             "pydantic",

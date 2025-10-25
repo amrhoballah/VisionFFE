@@ -7,6 +7,13 @@ from bson import ObjectId
 class UserBase(BaseModel):
     username: str
     email: EmailStr
+    firstName: str
+    lastName: str
+    title: str  # Office, Freelancer, or Supplier
+    officeName: Optional[str] = None  # Only for Office title
+    supplierName: Optional[str] = None  # Only for Supplier title
+    location: str  # Country
+    phone: str  # Full phone number with country code
 
 class UserCreate(UserBase):
     password: str
@@ -21,6 +28,13 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     username: Optional[str] = None
     email: Optional[EmailStr] = None
+    firstName: Optional[str] = None
+    lastName: Optional[str] = None
+    title: Optional[str] = None
+    officeName: Optional[str] = None
+    supplierName: Optional[str] = None
+    location: Optional[str] = None
+    phone: Optional[str] = None
     is_active: Optional[bool] = None
     is_verified: Optional[bool] = None
 

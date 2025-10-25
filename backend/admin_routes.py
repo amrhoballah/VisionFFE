@@ -85,6 +85,13 @@ async def create_user(
         username=user_data.username,
         email=user_data.email,
         hashed_password=hashed_password,
+        firstName=user_data.firstName,
+        lastName=user_data.lastName,
+        title=user_data.title,
+        officeName=user_data.officeName,
+        supplierName=user_data.supplierName,
+        location=user_data.location,
+        phone=user_data.phone,
         is_active=True,
         is_verified=True  # Admin-created users are auto-verified
     )

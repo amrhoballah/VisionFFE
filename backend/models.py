@@ -8,6 +8,13 @@ class User(Document):
     username: Indexed(str, unique=True)
     email: Indexed(EmailStr, unique=True)
     hashed_password: str
+    firstName: str
+    lastName: str
+    title: str  # Office, Freelancer, or Supplier
+    officeName: Optional[str] = None  # Only for Office title
+    supplierName: Optional[str] = None  # Only for Supplier title
+    location: str  # Country
+    phone: str  # Full phone number with country code
     is_active: bool = True
     is_verified: bool = False
     created_at: datetime = Field(default_factory=datetime.utcnow)

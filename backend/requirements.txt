@@ -16,7 +16,7 @@ boto3
 botocore
 open-clip-torch
 python-jose[cryptography]
-passlib[bcrypt]
+passlib[argon2]
 motor
 pymongo
 pydantic

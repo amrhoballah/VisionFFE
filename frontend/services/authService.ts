@@ -10,6 +10,13 @@ export interface RegisterRequest {
   username: string;
   email: string;
   password: string;
+  firstName: string;
+  lastName: string;
+  title: string;
+  officeName?: string;
+  supplierName?: string;
+  location: string;
+  phone: string;
 }
 
 export interface TokenResponse {
@@ -23,6 +30,13 @@ export interface UserResponse {
   id: string;
   username: string;
   email: string;
+  firstName: string;
+  lastName: string;
+  title: string;
+  officeName?: string;
+  supplierName?: string;
+  location: string;
+  phone: string;
   is_active: boolean;
   is_verified: boolean;
   created_at: string;

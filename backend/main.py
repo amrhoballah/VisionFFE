@@ -21,19 +21,6 @@ from auth_dependencies import require_search_permission, require_upload_permissi
 
 load_dotenv()
 
-app = FastAPI(
-    title="VisionFFE API",
-    description="AI-powered furniture image similarity search using deep learning",
-    version="0.0.1"
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -135,7 +122,20 @@ async def lifespan(app: FastAPI):
     print("🛑 Shutting down...")
     await close_database()
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    title="VisionFFE API",
+    description="AI-powered furniture image similarity search using deep learning",
+    version="0.0.1",
+    lifespan=lifespan
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Include authentication routers
 app.include_router(auth_router)

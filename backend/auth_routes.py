@@ -49,24 +49,55 @@ async def register(user_data: RegisterRequest):
     user = User(
         username=user_data.username,
         email=user_data.email,
-        hashed_password=hashed_password
+        hashed_password=hashed_password,
+        firstName=user_data.firstName,
+        lastName=user_data.lastName,
+        title=user_data.title,
+        officeName=user_data.officeName,
+        supplierName=user_data.supplierName,
+        location=user_data.location,
+        phone=user_data.phone
     )
     
     # Assign default role (user)
-    default_role = await Role.find_one(Role.name == "user")
+    default_role = await Role.find_one({
+        "$or": [
+                Role.name == "supplier",
+                Role.name == "designer"
+            ]
+        })
     if default_role:
         user.role_ids.append(default_role.id)
     
     await user.insert()
     
-    return user
+    return {
+        "id": str(user.id),
+        "username": user.username,
+        "email": user.email,
+        "firstName": user.firstName,
+        "lastName": user.lastName,
+        "title": user.title,
+        "officeName": user.officeName,
+        "supplierName": user.supplierName,
+        "location": user.location,
+        "phone": user.phone,
+        "is_active": user.is_active,
+        "is_verified": user.is_verified,
+        "created_at": user.created_at,
+        "role_ids": [str(rid) for rid in user.role_ids],
+    }
 
 @router.post("/login", response_model=TokenResponse)
 async def login(login_data: LoginRequest):
     """Login and return access and refresh tokens."""
     # Find user by username or email
-    user = await User.find_one(
-        (User.username == login_data.username) | (User.email == login_data.username)
+    user = await User.find_one({
+        "$or": [
+                {"username": login_data.username},
+                {"email": login_data.username}
+            ]
+        }
     )
     
     if not user or not verify_password(login_data.password, user.hashed_password):
