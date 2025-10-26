@@ -78,8 +78,9 @@ async def get_user_roles_and_permissions(user: User) -> tuple[List[Role], List[P
         return [], []
     
     # Get user's roles using Beanie's query syntax
-    roles = await Role.find({"id": {"$in": user.role_ids}}).to_list()
-    
+    roles = await Role.find({"_id": {"$in": user.role_ids}}).to_list()
+
+
     # Get all permissions for these roles
     permission_ids = []
     for role in roles:
@@ -88,7 +89,7 @@ async def get_user_roles_and_permissions(user: User) -> tuple[List[Role], List[P
     if not permission_ids:
         return roles, []
     
-    permissions = await Permission.find({"id": {"$in": permission_ids}}).to_list()
+    permissions = await Permission.find({"_id": {"$in": permission_ids}}).to_list()
     return roles, permissions
 
 def require_permission(resource: str, action: str):
@@ -96,7 +97,6 @@ def require_permission(resource: str, action: str):
     async def permission_checker(current_user: User = Depends(get_current_active_user)) -> User:
         # Get user's roles and permissions
         roles, permissions = await get_user_roles_and_permissions(current_user)
-        
         # Check if user has admin role (full access)
         admin_role = any(role.name == "admin" for role in roles)
         if admin_role:

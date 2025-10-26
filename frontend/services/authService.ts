@@ -239,11 +239,19 @@ class AuthService {
       throw new Error('No access token available');
     }
 
-    const headers = {
+    // Don't set Content-Type for FormData - browser will set it with boundary
+    const isFormData = options.body instanceof FormData;
+    const headers: Record<string, string> = {
       'Authorization': `Bearer ${this.accessToken}`,
-      'Content-Type': 'application/json',
-      ...options.headers,
     };
+    
+    // Only set Content-Type if it's not FormData
+    if (!isFormData) {
+      headers['Content-Type'] = 'application/json';
+    }
+    
+    // Merge with any existing headers
+    Object.assign(headers, options.headers);
 
     const response = await fetch(url, {
       ...options,

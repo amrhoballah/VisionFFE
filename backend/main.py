@@ -173,7 +173,7 @@ async def search_similar(
     
     try:
         all_results = []
-        
+        print(files)
         # Process each file
         for file in files:
             query_embedding = await uploader.search_item(file)
