@@ -217,7 +217,7 @@ const ExtractorApp: React.FC = () => {
             <div className="flex items-center justify-center gap-3 mb-2">
                 <ImageIcon className="w-8 h-8 text-brand-primary" />
                 <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-brand-primary to-brand-secondary">
-                    Room Furniture Extractor
+                    VisionFFE
                 </h1>
             </div>
             <div className="flex items-center justify-between max-w-2xl mx-auto mb-4">

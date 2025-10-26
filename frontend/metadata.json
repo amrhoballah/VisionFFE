@@ -1,5 +1,5 @@
 {
-  "name": "Multiple Render Room Furniture Extractor",
+  "name": "VisionFFE",
   "description": "Upload a 3D render or photo of a room, and this application will use AI to identify and extract each piece of furniture and decor into individual, downloadable images with transparent backgrounds.",
   "requestFramePermissions": []
 }

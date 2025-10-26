@@ -6,6 +6,7 @@ from models import User, Role, Permission
 from schemas import UserResponse, UserCreate, UserUpdate, RoleResponse, RoleCreate, RoleUpdate
 from auth_dependencies import require_admin, get_current_active_user
 from auth_utils import get_password_hash, check_password_strength
+from user_utils import user_to_dict
 
 router = APIRouter(prefix="/admin", tags=["user-management"])
 
@@ -26,7 +27,7 @@ async def get_users(
         )
     
     users = await query.skip(skip).limit(limit).to_list()
-    return users
+    return [user_to_dict(user) for user in users]
 
 @router.get("/users/{user_id}", response_model=UserResponse)
 async def get_user(
@@ -47,7 +48,7 @@ async def get_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
-    return user
+    return user_to_dict(user)
 
 @router.post("/users", response_model=UserResponse)
 async def create_user(
@@ -102,7 +103,7 @@ async def create_user(
         user.role_ids.append(default_role.id)
     
     await user.insert()
-    return user
+    return user_to_dict(user)
 
 @router.put("/users/{user_id}", response_model=UserResponse)
 async def update_user(
@@ -159,7 +160,7 @@ async def update_user(
         user.is_verified = user_data.is_verified
     
     await user.save()
-    return user
+    return user_to_dict(user)
 
 @router.delete("/users/{user_id}")
 async def delete_user(

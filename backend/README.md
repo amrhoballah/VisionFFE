@@ -1,6 +1,6 @@
-# Furniture Image Similarity Search API
+# VisionFFE API
 
-AI-powered furniture image similarity search using deep learning and Pinecone vector database.
+AI-powered FFE extraction and furniture image similarity search using deep learning and Pinecone vector database.
 
 ## Features
 

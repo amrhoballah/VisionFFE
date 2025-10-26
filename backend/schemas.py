@@ -7,13 +7,13 @@ from bson import ObjectId
 class UserBase(BaseModel):
     username: str
     email: EmailStr
-    firstName: str
-    lastName: str
-    title: str  # Office, Freelancer, or Supplier
+    firstName: Optional[str] = ""  # Legacy support
+    lastName: Optional[str] = ""  # Legacy support
+    title: Optional[str] = ""  # Legacy support: Office, Freelancer, or Supplier
     officeName: Optional[str] = None  # Only for Office title
     supplierName: Optional[str] = None  # Only for Supplier title
-    location: str  # Country
-    phone: str  # Full phone number with country code
+    location: Optional[str] = ""  # Legacy support: Country
+    phone: Optional[str] = ""  # Legacy support: Full phone number with country code
 
 class UserCreate(UserBase):
     password: str

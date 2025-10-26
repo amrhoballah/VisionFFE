@@ -14,6 +14,7 @@ from auth_utils import (
 )
 from auth_dependencies import get_current_user, get_current_active_user, require_admin
 from auth_config import auth_settings
+from user_utils import user_to_dict
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
@@ -71,22 +72,8 @@ async def register(user_data: RegisterRequest):
     
     await user.insert()
     
-    return {
-        "id": str(user.id),
-        "username": user.username,
-        "email": user.email,
-        "firstName": user.firstName,
-        "lastName": user.lastName,
-        "title": user.title,
-        "officeName": user.officeName,
-        "supplierName": user.supplierName,
-        "location": user.location,
-        "phone": user.phone,
-        "is_active": user.is_active,
-        "is_verified": user.is_verified,
-        "created_at": user.created_at,
-        "role_ids": [str(rid) for rid in user.role_ids],
-    }
+    # Convert to dict and ensure ObjectIds are strings
+    return user_to_dict(user)
 
 @router.post("/login", response_model=TokenResponse)
 async def login(login_data: LoginRequest):
@@ -243,4 +230,4 @@ async def change_password(
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(current_user: User = Depends(get_current_active_user)):
     """Get current user information."""
-    return current_user
+    return user_to_dict(current_user)

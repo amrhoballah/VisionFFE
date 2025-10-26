@@ -22,21 +22,12 @@ from auth_dependencies import require_search_permission, require_upload_permissi
 
 load_dotenv()
 
-
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Handles startup and shutdown events cleanly."""
     print("🚀 Starting up...")
-
-    # Initialize state attributes with defaults
-    app.state.embedder = None
-    app.state.pinecone = None
-    app.state.pinecone_index = None
-    app.state.r2 = None
-    app.state.r2_bucket = None
-    app.state.uploader = None
 
     # --- Initialize MongoDB Database ---
     print("📊 Initializing MongoDB database...")
