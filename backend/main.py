@@ -156,7 +156,7 @@ async def root(request: Request):
 @app.post("/api/search")
 async def search_similar(
     request: Request, 
-    file: UploadFile = File(...), 
+    files: List[UploadFile] = File(...), 
     top_k: int = 5,
     current_user = Depends(require_search_permission)
 ):
@@ -172,32 +172,49 @@ async def search_similar(
         raise HTTPException(status_code=500, detail="Uploader service not available")
     
     try:
-        query_embedding = await uploader.search_item(file)
+        all_results = []
+        
+        # Process each file
+        for file in files:
+            query_embedding = await uploader.search_item(file)
 
-        if query_embedding is None:
-            raise HTTPException(status_code=400, detail="Failed to process image")
-        
-        results = pinecone_index.query(
-            vector=query_embedding.tolist(),
-            top_k=top_k,
-            include_metadata=True
-        )
-        
-        formatted_results = []
-        for match in results['matches']:
-            result = {
-                "id": match['id'],
-                "similarity_score": float(match['score']),
-                "metadata": match.get('metadata', {}),
-                "image_path": match['metadata'].get('image_path', ''),
-                "filename": match['metadata'].get('filename', '')
-            }
-            formatted_results.append(result)
+            if query_embedding is None:
+                # If processing fails for one image, continue with others
+                all_results.append({
+                    "query_filename": file.filename,
+                    "success": False,
+                    "error": "Failed to process image",
+                    "results": []
+                })
+                continue
+            
+            results = pinecone_index.query(
+                vector=query_embedding.tolist(),
+                top_k=top_k,
+                include_metadata=True
+            )
+            
+            formatted_results = []
+            for match in results['matches']:
+                result = {
+                    "id": match['id'],
+                    "similarity_score": float(match['score']),
+                    "metadata": match.get('metadata', {}),
+                    "image_path": match['metadata'].get('image_path', ''),
+                    "filename": match['metadata'].get('filename', '')
+                }
+                formatted_results.append(result)
+            
+            all_results.append({
+                "query_filename": file.filename,
+                "success": True,
+                "results": formatted_results
+            })
         
         return {
             "success": True,
-            "query_filename": file.filename,
-            "results": formatted_results,
+            "total_files": len(files),
+            "results": all_results,
             "total_database_size": pinecone_index.describe_index_stats()['total_vector_count']
         }
     except Exception as e:

@@ -152,7 +152,7 @@ const ExtractorApp: React.FC = () => {
     const selectedItems = extractedItems.filter(item => selectedItemIds.has(item.id));
     
     // Use the backend API endpoint for uploading images
-    const FASTAPI_ENDPOINT = `${config.api.baseUrl}/api/upload`;
+    const FASTAPI_ENDPOINT = `${config.api.baseUrl}/api/search`;
 
     try {
         // Convert base64 images to files for upload
@@ -172,14 +172,6 @@ const ExtractorApp: React.FC = () => {
         files.forEach(file => {
             formData.append('files', file);
         });
-
-        // Add metadata
-        const metadata = selectedItems.map(item => ({
-            name: item.name,
-            category: 'furniture',
-            extracted_from: 'room_image'
-        }));
-        formData.append('metadata', JSON.stringify(metadata));
 
         // Use authenticated fetch
         const response = await authService.authenticatedFetch(FASTAPI_ENDPOINT, {

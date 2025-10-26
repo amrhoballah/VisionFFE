@@ -77,8 +77,8 @@ async def get_user_roles_and_permissions(user: User) -> tuple[List[Role], List[P
     if not user.role_ids:
         return [], []
     
-    # Get user's roles
-    roles = await Role.find(Role.id.in_(user.role_ids)).to_list()
+    # Get user's roles using Beanie's query syntax
+    roles = await Role.find({"id": {"$in": user.role_ids}}).to_list()
     
     # Get all permissions for these roles
     permission_ids = []
@@ -88,7 +88,7 @@ async def get_user_roles_and_permissions(user: User) -> tuple[List[Role], List[P
     if not permission_ids:
         return roles, []
     
-    permissions = await Permission.find(Permission.id.in_(permission_ids)).to_list()
+    permissions = await Permission.find({"id": {"$in": permission_ids}}).to_list()
     return roles, permissions
 
 def require_permission(resource: str, action: str):
