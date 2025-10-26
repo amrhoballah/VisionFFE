@@ -55,6 +55,34 @@ class AuthService {
   constructor(baseUrl: string = config.api.baseUrl) {
     this.baseUrl = baseUrl;
     this.loadTokensFromStorage();
+    
+    // Set up automatic token refresh
+    this.setupTokenRefresh();
+  }
+  
+  private setupTokenRefresh(): void {
+    // Run periodic token refresh check every 5 minutes
+    if (typeof window !== 'undefined') {
+      setInterval(async () => {
+        if (this.refreshToken && this.accessToken) {
+          try {
+            // Try to refresh token if we have valid refresh token
+            const isExpiring = await this.isTokenExpiringSoon();
+            if (isExpiring) {
+              await this.refreshAccessToken();
+            }
+          } catch (error) {
+            console.warn('Background token refresh failed:', error);
+          }
+        }
+      }, 5 * 60 * 1000); // Check every 5 minutes
+    }
+  }
+  
+  private async isTokenExpiringSoon(): Promise<boolean> {
+    // Simple check: If token exists and refresh token exists, consider refreshing
+    // In a real implementation, you'd decode the JWT and check expiration
+    return this.refreshToken !== null && this.accessToken !== null;
   }
 
   // Token management

@@ -32,7 +32,9 @@ image = (
             "pydantic",
             "pydantic-settings",
             "email-validator",
-            "beanie"
+            "beanie",
+            "certifi",
+            "google-genai"
         ]
     )
     # ✅ Copy everything in your current folder into /root/app

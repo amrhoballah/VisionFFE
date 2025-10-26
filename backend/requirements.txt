@@ -24,3 +24,4 @@ pydantic-settings
 email-validator
 beanie
 certifi
+google-genai

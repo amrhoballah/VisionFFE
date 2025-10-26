@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { ExtractedItem } from './types';
-import { identifyItems, extractItemImage } from './services/geminiService';
+import { identifyItems, extractItemImage } from './services/backendGeminiService';
 import { authService } from './services/authService';
 import { useAuth } from './contexts/AuthContext';
 import config from './config';
