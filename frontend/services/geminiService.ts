@@ -34,11 +34,12 @@ export async function identifyItems(
         parts: [
           ...imageParts,
           {
-            text: "Analyze the provided room images, which show different angles of the same room. Identify every distinct piece of furniture, decor, and lighting. Consolidate items seen from multiple angles to avoid duplicates. Provide a short, unique, descriptive name for each item. Return the result as a JSON array of strings.",
+            text: "Analyze the provided room images, which show different angles of the same room. Identify every distinct piece of furniture, decor, and lighting. Consolidate items seen from multiple angles to avoid duplicates. Provide a short, unique, descriptive name for each item. Return the result as a JSON array of strings. If the item is two of something just extract one of it",
           },
         ],
       },
       config: {
+        temperature: 0.3,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -71,11 +72,11 @@ export async function extractItemImage(
             contents: {
                 parts: [
                     ...imageParts,
-                    { text: `From the provided images, find the best view of the '${itemName}' and create a new image that contains only that item. The item should be perfectly isolated with a transparent background and preferably be a frond view of the item. If the item is two of something just extract one of it.` },
+                    { text: `From the provided images, find the best view of the '${itemName}' and create a new image that contains only that item. The item should be perfectly isolated with a transparent background and preferably be a frond view of the item.` },
                 ],
             },
-            // FIX: The responseModalities array must contain only Modality.IMAGE for gemini-2.5-flash-image.
             config: {
+                temperature: 0.3,
                 responseModalities: [Modality.IMAGE],
             },
         });
