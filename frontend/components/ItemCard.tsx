@@ -63,11 +63,11 @@ const ItemCard: React.FC<ItemCardProps> = ({ item, isSelected, onSelect }) => {
                 >
                   <div className="flex gap-3">
                     {/* Image */}
-                    {result.image_path && (
+                    {result.metadata?.image_url && (
                       <div className="flex-shrink-0">
                         <img
-                          src={result.image_path}
-                          alt={result.metadata?.name || result.filename}
+                          src={result.metadata?.image_urlh}
+                          alt={result.metadata?.title || result.filename}
                           className="w-20 h-20 object-cover rounded-md bg-base-200"
                           onError={(e) => {
                             (e.target as HTMLImageElement).style.display = 'none';
@@ -79,9 +79,9 @@ const ItemCard: React.FC<ItemCardProps> = ({ item, isSelected, onSelect }) => {
                     {/* Content */}
                     <div className="flex-grow min-w-0">
                       {/* Title */}
-                      {result.metadata?.name && (
+                      {result.metadata?.title && (
                         <h4 className="font-semibold text-base-content truncate mb-1">
-                          {result.metadata.name}
+                          {result.metadata.title}
                         </h4>
                       )}
                       
