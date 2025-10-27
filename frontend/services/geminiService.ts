@@ -34,12 +34,12 @@ export async function identifyItems(
         parts: [
           ...imageParts,
           {
-            text: "Analyze the provided room images, which show different angles of the same room. Identify every distinct piece of furniture, decor, and lighting. Consolidate items seen from multiple angles to avoid duplicates. Provide a short, unique, descriptive name for each item. Return the result as a JSON array of strings. If the item is two of something just extract one of it",
+            text: "Analyze the provided room images, which show different angles of the same room. Identify every distinct piece of furniture, decor, and lighting. Consolidate items seen from multiple angles to avoid duplicates and use colours to differentiate between items. Provide a short, unique, descriptive name for each item. Return the result as a JSON array of strings. If the item is two of something just extract one of it",
           },
         ],
       },
       config: {
-        temperature: 0.3,
+        temperature: 0.5,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -76,7 +76,7 @@ export async function extractItemImage(
                 ],
             },
             config: {
-                temperature: 0.3,
+                temperature: 0.5,
                 responseModalities: [Modality.IMAGE],
             },
         });
