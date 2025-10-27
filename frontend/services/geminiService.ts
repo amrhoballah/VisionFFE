@@ -71,7 +71,7 @@ export async function extractItemImage(
             contents: {
                 parts: [
                     ...imageParts,
-                    { text: `From the provided images, find the best view of the '${itemName}' and create a new image that contains only that item. The item should be perfectly isolated with a transparent background.` },
+                    { text: `From the provided images, find the best view of the '${itemName}' and create a new image that contains only that item. The item should be perfectly isolated with a transparent background and preferably be a frond view of the item. If the item is two of something just extract one of it.` },
                 ],
             },
             // FIX: The responseModalities array must contain only Modality.IMAGE for gemini-2.5-flash-image.
