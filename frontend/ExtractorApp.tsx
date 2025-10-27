@@ -185,9 +185,32 @@ const ExtractorApp: React.FC = () => {
         }
 
         const result = await response.json();
+        
+        // Update each selected item with its search results
+        if (result.success && result.results) {
+            setExtractedItems(prevItems => {
+                return prevItems.map(item => {
+                    if (selectedItemIds.has(item.id)) {
+                        // Find matching result by filename
+                        const matchingResult = result.results.find((res: any) => 
+                            res.query_filename === `${item.name}.png`
+                        );
+                        
+                        if (matchingResult && matchingResult.success) {
+                            return {
+                                ...item,
+                                searchResults: matchingResult.results
+                            };
+                        }
+                    }
+                    return item;
+                });
+            });
+        }
+        
         setApiFeedback({ 
             type: 'success', 
-            message: `Successfully uploaded ${result.uploaded} items to the database!` 
+            message: `Found ${result.total_files} similar items!` 
         });
         setSelectedItemIds(new Set()); // Clear selection on success
 
