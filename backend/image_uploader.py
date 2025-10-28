@@ -14,14 +14,15 @@ class ImageUploader:
             # Generate unique filename with same extension
             file_ext = os.path.splitext(file.filename)[1]
             unique_name = f"{uuid.uuid4().hex}{file_ext}"
+            # Store in uploads folder
             self.s3_client.put_object(
                 Bucket=self.bucket_name,
-                Key=unique_name,
+                Key=f"noise/{unique_name}",
                 Body=file_bytes,
                 ContentType=file.content_type
             )
 
-            file_url = f"{os.getenv('R2_URL')}/{unique_name}"
+            file_url = f"{os.getenv('R2_URL')}/noise/{unique_name}"
             
             embedding = self.embedder.get_embedding(file_url)
             if embedding is None:
@@ -53,21 +54,22 @@ class ImageUploader:
             # Generate unique filename with same extension
             file_ext = os.path.splitext(file.filename)[1]
             unique_name = f"{uuid.uuid4().hex}{file_ext}"
+            # Store search queries in temp folder
             self.s3_client.put_object(
                 Bucket=self.bucket_name,
-                Key=unique_name,
+                Key=f"temp/{unique_name}",
                 Body=file_bytes,
                 ContentType=file.content_type
             )
 
-            file_url = f"{os.getenv('R2_URL')}/{unique_name}"
+            file_url = f"{os.getenv('R2_URL')}/temp/{unique_name}"
             
-            embedding = self.embedder.get_embedding(file_url)
-            if embedding is None:
-                print(f"Failed to get embedding for image {unique_name}")
-                return False
+            # embedding = self.embedder.get_embedding(file_url)
+            # if embedding is None:
+            #     print(f"Failed to get embedding for image {unique_name}")
+            #     return False
     
-            return embedding
+            return file_url
         
         except Exception as e:
             print(f"Failed to upload image {unique_name}: {e}")

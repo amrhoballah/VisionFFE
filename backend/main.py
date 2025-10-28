@@ -225,7 +225,7 @@ async def upload_images(
     request: Request, 
     files: List[UploadFile] = File(...), 
     metadata: Optional[str] = None,
-    current_user = Depends(require_upload_permission)
+    # current_user = Depends(require_upload_permission)
 ):
     uploader = request.app.state.uploader
     pinecone_index = request.app.state.pinecone_index
@@ -246,18 +246,18 @@ async def upload_images(
         vectors_to_upsert = []        
         for i, file in enumerate(files):
             file_metadata = metadata_list[i] if i < len(metadata_list) else {}
-            success = await uploader.add_furniture_item(file, file_metadata)
-            if success:
-                vectors_to_upsert.append(file.filename)
+            return await uploader.add_furniture_item(file, file_metadata)
+        #     if success:
+        #         vectors_to_upsert.append(file.filename)
         
-        stats = pinecone_index.describe_index_stats()
+        # stats = pinecone_index.describe_index_stats()
         
-        return {
-            "success": True,
-            "uploaded": len(vectors_to_upsert),
-            "failed": len(files) - len(vectors_to_upsert),
-            "total_database_size": stats['total_vector_count']
-        }
+        # return {
+        #     "success": True,
+        #     "uploaded": len(vectors_to_upsert),
+        #     "failed": len(files) - len(vectors_to_upsert),
+        #     "total_database_size": stats['total_vector_count']
+        # }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
