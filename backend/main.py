@@ -281,8 +281,3 @@ async def get_database_stats(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
-
-
-
-import uvicorn
-uvicorn.run(app, host="0.0.0.0", port=8080)
