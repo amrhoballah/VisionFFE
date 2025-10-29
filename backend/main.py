@@ -5,8 +5,14 @@ import torch
 from contextlib import asynccontextmanager
 import os
 import json
+import sys
 from pinecone import Pinecone
 from dotenv import load_dotenv
+
+# Configure unbuffered output for deployment logs
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(line_buffering=True)
+    sys.stderr.reconfigure(line_buffering=True)
 from image_embedder import ImageEmbedder
 from image_embedder3 import ImageEmbedder3
 from image_uploader import ImageUploader
