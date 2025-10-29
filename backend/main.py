@@ -44,7 +44,7 @@ async def lifespan(app: FastAPI):
     print("🔧 Initializing embedder model...")
     try:
         model_preset = os.getenv("MODEL_PRESET", "balanced")
-        app.state.embedder = ImageEmbedder3(preset=model_preset, device=device)
+        app.state.embedder = ImageEmbedder(preset=model_preset, device=device)
         print(f"✅ Embedder loaded with preset: {model_preset}")
     except Exception as e:
         print(f"⚠️ Warning: Could not load embedder: {e}")
