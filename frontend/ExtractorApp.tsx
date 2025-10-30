@@ -123,27 +123,27 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
     setUploadedImagePreviews(prev => [...prev, ...newBlobUrls]);
     
     // Upload to backend project for persistence
-    try {
-      const form = new FormData();
-      fileArray.forEach(f => form.append('files', f));
-      const endpoint = `${config.api.baseUrl}/projects/${projectId}/photos`;
-      const res = await authService.authenticatedFetch(endpoint, { method: 'POST', body: form });
-      if (!res.ok) {
-        // Non-blocking: allow analysis to proceed even if persistence fails
-        console.warn('Failed to persist photos to project');
-      } else {
-        // Update previews with actual URLs from backend
-        const project = await res.json();
-        if (project.photo_urls) {
-          // Revoke the blob URLs we created
-          newBlobUrls.forEach(url => URL.revokeObjectURL(url));
-          // Use all URLs from backend
-          setUploadedImagePreviews(project.photo_urls);
-        }
-      }
-    } catch (e) {
-      console.warn('Upload to project failed', e);
-    }
+    // try {
+    //   const form = new FormData();
+    //   fileArray.forEach(f => form.append('files', f));
+    //   const endpoint = `${config.api.baseUrl}/projects/${projectId}/photos`;
+    //   const res = await authService.authenticatedFetch(endpoint, { method: 'POST', body: form });
+    //   if (!res.ok) {
+    //     // Non-blocking: allow analysis to proceed even if persistence fails
+    //     console.warn('Failed to persist photos to project');
+    //   } else {
+    //     // Update previews with actual URLs from backend
+    //     const project = await res.json();
+    //     if (project.photo_urls) {
+    //       // Revoke the blob URLs we created
+    //       newBlobUrls.forEach(url => URL.revokeObjectURL(url));
+    //       // Use all URLs from backend
+    //       setUploadedImagePreviews(project.photo_urls);
+    //     }
+    //   }
+    // } catch (e) {
+    //   console.warn('Upload to project failed', e);
+    // }
   };
   
   const runExtractionProcess = useCallback(async () => {

@@ -65,6 +65,7 @@ class GeminiService:
             List of identified item names
         """
         try:
+            print("I am here 4")
             images_base64 = []
             for img_url in image_url:
                 response = requests.get(img_url)
@@ -74,13 +75,15 @@ class GeminiService:
                 images_base64.append(img_base64)
             
             # Convert images to generative parts
+            print("I am here 5")
             image_parts = [
                 self._file_to_generative_part(img, "image/jpeg") 
                 for img in images_base64
             ]
 
+            print("I am here 6")
             response = self.client.models.generate_content(
-                model="gemini-2.0-flash-exp",
+                model="gemini-2.5-flash-image",
                 contents={
                     "parts": image_parts + [
                         {
@@ -109,62 +112,3 @@ class GeminiService:
         except Exception as error:
             print(f"Error identifying items: {error}")
             raise ValueError("Failed to identify items from the images. Please try different ones.")
-    
-    async def extract_item_image(self, image_url: List[str], item_name: str) -> str:
-        """
-        Extract a specific item from room images as an isolated image.
-        
-        Args:
-            image_url: List of image URLs
-            item_name: Name of the item to extract
-            
-        Returns:
-            Base64-encoded image of the extracted item
-        """
-        try:
-            images_base64 = []
-            for img_url in image_url:
-                response = requests.get(img_url)
-                response.raise_for_status()
-                # Convert image bytes to base64
-                img_base64 = b64.b64encode(response.content).decode('utf-8')
-                images_base64.append(img_base64)
-            
-            # Convert images to generative parts
-            image_parts = [
-                self._file_to_generative_part(img, "image/jpeg") 
-                for img in images_base64
-            ]
-
-            response = self.client.models.generate_content(
-                model="gemini-2.0-flash-exp",
-                contents={
-                    "parts": image_parts + [
-                        {
-                            "text": f"Extract the '{item_name}' from the provided room images. Return only the isolated item as a single image with a transparent or white background. Do not include any other objects or parts of the room.",
-                        },
-                    ],
-                },
-                config={
-                    "temperature": 0.3,
-                },
-            )
-            
-            # Get the extracted image from response
-            if hasattr(response, 'text') and response.text:
-                json_text = response.text.strip()
-                data = json.loads(json_text)
-                
-                # The response might contain base64 encoded image
-                if isinstance(data, dict) and 'image' in data:
-                    return data['image']
-                elif isinstance(data, str):
-                    return data
-                else:
-                    raise ValueError("Unexpected response format from Gemini")
-            else:
-                raise ValueError("No image returned from Gemini")
-            
-        except Exception as error:
-            print(f"Error extracting item: {error}")
-            raise ValueError(f"Failed to extract '{item_name}'.")

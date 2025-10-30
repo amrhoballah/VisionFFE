@@ -141,7 +141,7 @@ async def identify_project_items(
     
     # Collect all image URLs
     image_urls = []
-    
+    print("I am here")
     # If files are provided, upload them first and add URLs
     if files:
         uploaded_urls: List[str] = []
@@ -159,6 +159,7 @@ async def identify_project_items(
     
     # Parse and add provided URLs
     if urls:
+        print("I am here 2")
         try:
             url_list = json.loads(urls) if isinstance(urls, str) else urls
             image_urls.extend(url_list)
@@ -172,6 +173,7 @@ async def identify_project_items(
     
     # Call Gemini service to identify items
     try:
+        print("I am here 3")
         items = await gemini_service.identify_items(image_urls)
         return {"items": items}
     except ValueError as e:
