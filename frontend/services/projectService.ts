@@ -40,4 +40,13 @@ export async function uploadProjectPhotos(projectId: string, files: FileList | F
   return res.json();
 }
 
-
+export async function deleteProjectPhoto(projectId: string, photoUrl: string): Promise<void> {
+  const res = await authService.authenticatedFetch(`${config.api.baseUrl}/projects/${projectId}/photos`, {
+    method: 'DELETE',
+    body: JSON.stringify({ photo_url: photoUrl }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || 'Failed to delete photo');
+  }
+}

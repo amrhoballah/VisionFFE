@@ -7,7 +7,8 @@ import config from './config';
 import FileUpload from './components/FileUpload';
 import ItemCard from './components/ItemCard';
 import Loader from './components/Loader';
-import { DownloadIcon, ResetIcon, ImageIcon, SendIcon } from './components/Icons';
+import { DownloadIcon, ResetIcon, ImageIcon, SendIcon, XIcon } from './components/Icons';
+import { deleteProjectPhoto } from './services/projectService';
 
 // Declare JSZip for TypeScript since it's loaded from a CDN
 declare var JSZip: any;
@@ -28,6 +29,7 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [isSending, setIsSending] = useState<boolean>(false);
   const [apiFeedback, setApiFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [deletingPhotoUrl, setDeletingPhotoUrl] = useState<string | null>(null);
   
   const { logout, user } = useAuth();
 
@@ -90,7 +92,12 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
   const resetState = useCallback(() => {
     setUploadedFiles([]);
     setUploadedImagePreviews(prev => {
-        prev.forEach(url => URL.revokeObjectURL(url));
+        // Only revoke object URLs created locally, not remote URLs from DB
+        prev.forEach(url => {
+            if (url.startsWith('blob:')) {
+                URL.revokeObjectURL(url);
+            }
+        });
         return [];
     });
     setExtractedItems([]);
@@ -100,6 +107,7 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
     setSelectedItemIds(new Set());
     setIsSending(false);
     setApiFeedback(null);
+    setDeletingPhotoUrl(null);
   }, []);
 
   const handleFileUpload = async (files: FileList) => {
@@ -199,7 +207,7 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
         setIsLoading(false);
         setLoadingMessage('');
     }
-  }, [uploadedFiles]);
+  }, [uploadedFiles, projectId]);
 
 
   const handleDownloadZip = async () => {
@@ -332,6 +340,19 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
     }
   };
 
+  const handleDeletePhoto = async (photoUrl: string) => {
+    setDeletingPhotoUrl(photoUrl);
+    setError(null);
+    try {
+      await deleteProjectPhoto(projectId, photoUrl);
+      setUploadedImagePreviews(prev => prev.filter(url => url !== photoUrl));
+    } catch (err: any) {
+      setError(`Failed to delete image: ${err.message}`);
+    } finally {
+      setDeletingPhotoUrl(null);
+    }
+  };
+
 
   return (
     <div className="min-h-screen bg-base-100 text-base-content p-4 sm:p-6 lg:p-8">
@@ -377,11 +398,28 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
                 {isLoading && <Loader message={loadingMessage} />}
                 <h3 className="text-lg font-semibold mb-4 text-base-content">Uploaded Angles ({uploadedImagePreviews.length})</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 max-h-[40vh] overflow-y-auto pr-2">
-                  {uploadedImagePreviews.map((src, index) => (
-                    <div key={index} className="aspect-w-1 aspect-h-1 bg-base-300 rounded-md overflow-hidden">
-                        <img src={src} alt={`Uploaded room angle ${index + 1}`} className="w-full h-full object-cover" />
-                    </div>
-                  ))}
+                  {uploadedImagePreviews.map((src, index) => {
+                    const isPersisted = src.startsWith('http');
+                    return (
+                        <div key={src} className="group relative aspect-w-1 aspect-h-1 bg-base-300 rounded-md overflow-hidden">
+                            <img src={src} alt={`Uploaded room angle ${index + 1}`} className="w-full h-full object-cover" />
+                            {isPersisted && (
+                                <button
+                                  onClick={() => handleDeletePhoto(src)}
+                                  disabled={deletingPhotoUrl === src}
+                                  className="absolute top-1.5 right-1.5 bg-black/60 p-1 rounded-full text-white opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-black/80 transition-all disabled:opacity-70 disabled:cursor-wait"
+                                  aria-label="Delete image"
+                                >
+                                  {deletingPhotoUrl === src ? (
+                                    <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin"></div>
+                                  ) : (
+                                    <XIcon className="w-4 h-4" />
+                                  )}
+                                </button>
+                            )}
+                        </div>
+                    );
+                  })}
                 </div>
               </div>
 

@@ -5,12 +5,16 @@ from datetime import datetime
 import os
 import uuid
 import json
+from pydantic import BaseModel
 
 from models import Project, User
 from schemas import ProjectCreate, ProjectResponse
 from auth_dependencies import get_current_active_user, require_role_or_admin, require_search_permission
 
 router = APIRouter(prefix="/projects", tags=["projects"])
+
+class DeletePhotoRequest(BaseModel):
+    photo_url: str
 
 def project_to_dict(project: Project) -> ProjectResponse:
     return ProjectResponse(
@@ -76,6 +80,41 @@ async def upload_project_photos(
     project.photo_urls.extend(uploaded_urls)
     project.updated_at = datetime.utcnow()
     await project.save()
+    return project_to_dict(project)
+
+@router.delete("/{project_id}/photos", response_model=ProjectResponse)
+async def delete_project_photo(
+    request: Request,
+    project_id: str,
+    data: DeletePhotoRequest,
+    current_user: User = Depends(require_role_or_admin("designer"))
+):
+    """Delete a photo URL from the project's photo_urls list and from R2 storage."""
+    try:
+        project = await Project.find_one(Project.id == ObjectId(project_id), Project.user_id == current_user.id)
+    except:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid project id")
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    
+    # Remove the photo URL from the list if it exists
+    if data.photo_url in project.photo_urls:
+        # Delete from R2 storage first
+        uploader = request.app.state.uploader
+        if uploader:
+            try:
+                await uploader.delete_image(data.photo_url)
+            except Exception as r2_error:
+                # Log error but continue with DB deletion
+                print(f"Warning: Failed to delete from R2 storage: {r2_error}")
+        
+        # Remove from database
+        project.photo_urls.remove(data.photo_url)
+        project.updated_at = datetime.utcnow()
+        await project.save()
+    else:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Photo not found in project")
+    
     return project_to_dict(project)
 
 @router.post("/{project_id}/extracted-items", response_model=ProjectResponse)
