@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { ExtractedItem } from './types';
 import { identifyItems, extractItemImage } from './services/geminiService';
 import { authService } from './services/authService';
@@ -32,6 +32,8 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
   const [deletingPhotoUrl, setDeletingPhotoUrl] = useState<string | null>(null);
   
   const { logout, user } = useAuth();
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load existing project data when component mounts or projectId changes
   useEffect(() => {
@@ -111,10 +113,15 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
   }, []);
 
   const handleFileUpload = async (files: FileList) => {
-    resetState();
     const fileArray = Array.from(files);
-    setUploadedFiles(fileArray);
-    setUploadedImagePreviews(fileArray.map(file => URL.createObjectURL(file)));
+    
+    // Append new files instead of replacing
+    setUploadedFiles(prev => [...prev, ...fileArray]);
+    
+    // Create blob URLs for new files and append to previews
+    const newBlobUrls = fileArray.map(file => URL.createObjectURL(file));
+    setUploadedImagePreviews(prev => [...prev, ...newBlobUrls]);
+    
     // Upload to backend project for persistence
     try {
       const form = new FormData();
@@ -124,6 +131,15 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
       if (!res.ok) {
         // Non-blocking: allow analysis to proceed even if persistence fails
         console.warn('Failed to persist photos to project');
+      } else {
+        // Update previews with actual URLs from backend
+        const project = await res.json();
+        if (project.photo_urls) {
+          // Revoke the blob URLs we created
+          newBlobUrls.forEach(url => URL.revokeObjectURL(url));
+          // Use all URLs from backend
+          setUploadedImagePreviews(project.photo_urls);
+        }
       }
     } catch (e) {
       console.warn('Upload to project failed', e);
@@ -131,7 +147,11 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
   };
   
   const runExtractionProcess = useCallback(async () => {
-    if (uploadedFiles.length === 0) return;
+    // Check if we have images to work with
+    const hasFiles = uploadedFiles.length > 0;
+    const hasUrls = uploadedImagePreviews.some(url => url.startsWith('http'));
+    
+    if (!hasFiles && !hasUrls) return;
 
     setIsLoading(true);
     setError(null);
@@ -139,31 +159,104 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
     setApiFeedback(null);
     setSelectedItemIds(new Set());
 
-
     try {
-      setLoadingMessage('Preparing images...');
-      
-      const imagePromises = uploadedFiles.map(file => {
-        return new Promise<{base64: string, mimeType: string}>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.readAsDataURL(file);
-          reader.onloadend = () => {
-            const base64String = (reader.result as string).split(',')[1];
-            resolve({ base64: base64String, mimeType: file.type });
-          };
-          reader.onerror = (error) => reject(error);
-        });
-      });
-
-      const images = await Promise.all(imagePromises);
-
       setLoadingMessage('Analyzing room and identifying items...');
-      const itemNames = await identifyItems(images);
+      
+      let itemNames: string[] = [];
+      
+      // Use backend identify endpoint if we have URLs or files
+      if (hasUrls || hasFiles) {
+        const formData = new FormData();
+        
+        // Add files if we have them
+        if (hasFiles) {
+          uploadedFiles.forEach(file => {
+            formData.append('files', file);
+          });
+        }
+        
+        // Add URLs if we have them
+        if (hasUrls) {
+          const urls = uploadedImagePreviews.filter(url => url.startsWith('http'));
+          formData.append('urls', JSON.stringify(urls));
+        }
+        
+        const response = await authService.authenticatedFetch(
+          `${config.api.baseUrl}/projects/${projectId}/identify`,
+          {
+            method: 'POST',
+            body: formData,
+          }
+        );
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ detail: 'Failed to identify items' }));
+          throw new Error(errorData.detail || 'Failed to identify items');
+        }
+        
+        const data = await response.json();
+        itemNames = data.items || [];
+      } else {
+        // Fallback to frontend Gemini service
+        setLoadingMessage('Preparing images...');
+        
+        const imagePromises = uploadedFiles.map(file => {
+          return new Promise<{base64: string, mimeType: string}>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onloadend = () => {
+              const base64String = (reader.result as string).split(',')[1];
+              resolve({ base64: base64String, mimeType: file.type });
+            };
+            reader.onerror = (error) => reject(error);
+          });
+        });
+
+        const images = await Promise.all(imagePromises);
+        itemNames = await identifyItems(images);
+      }
 
       if (!itemNames || itemNames.length === 0) {
         setError("No items could be identified in the images. Please try different ones.");
         setIsLoading(false);
         return;
+      }
+
+      // Prepare images for extraction
+      setLoadingMessage('Preparing images for extraction...');
+      let images: {base64: string, mimeType: string}[] = [];
+      
+      if (hasFiles) {
+        // Get base64 from files
+        const imagePromises = uploadedFiles.map(file => {
+          return new Promise<{base64: string, mimeType: string}>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onloadend = () => {
+              const base64String = (reader.result as string).split(',')[1];
+              resolve({ base64: base64String, mimeType: file.type });
+            };
+            reader.onerror = (error) => reject(error);
+          });
+        });
+        images = await Promise.all(imagePromises);
+      } else if (hasUrls) {
+        // For URLs, we need to fetch and convert to base64
+        const urlList = uploadedImagePreviews.filter(url => url.startsWith('http'));
+        const imagePromises = urlList.map(async (url) => {
+          const response = await fetch(url);
+          const blob = await response.blob();
+          return new Promise<{base64: string, mimeType: string}>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(blob);
+            reader.onloadend = () => {
+              const base64String = (reader.result as string).split(',')[1];
+              resolve({ base64: base64String, mimeType: blob.type });
+            };
+            reader.onerror = (error) => reject(error);
+          });
+        });
+        images = await Promise.all(imagePromises);
       }
 
       const itemsToPersist: { name: string; base64: string }[] = [];
@@ -207,7 +300,7 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
         setIsLoading(false);
         setLoadingMessage('');
     }
-  }, [uploadedFiles, projectId]);
+  }, [uploadedFiles, uploadedImagePreviews, projectId]);
 
 
   const handleDownloadZip = async () => {
@@ -353,6 +446,20 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
     }
   };
 
+  const handleAddMorePhotos = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleFileUpload(e.target.files);
+    }
+    // Reset the input so the same file can be selected again
+    if (e.target) {
+      e.target.value = '';
+    }
+  };
+
 
   return (
     <div className="min-h-screen bg-base-100 text-base-content p-4 sm:p-6 lg:p-8">
@@ -390,13 +497,34 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
         </header>
 
         <main>
+          {/* Hidden file input for adding more photos */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            onChange={handleFileInputChange}
+            accept="image/png, image/jpeg, image/webp"
+            multiple
+            aria-label="Add more photos"
+          />
+          
           {uploadedImagePreviews.length === 0 ? (
             <FileUpload onFileUpload={handleFileUpload} isLoading={isLoading} />
           ) : (
             <div className="space-y-8">
               <div className="relative w-full max-w-5xl mx-auto bg-base-200 rounded-lg shadow-lg p-4">
                 {isLoading && <Loader message={loadingMessage} />}
-                <h3 className="text-lg font-semibold mb-4 text-base-content">Uploaded Angles ({uploadedImagePreviews.length})</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-base-content">Uploaded Angles ({uploadedImagePreviews.length})</h3>
+                  <button
+                    onClick={handleAddMorePhotos}
+                    disabled={isLoading}
+                    className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-brand-primary to-brand-secondary rounded-lg hover:scale-105 transform transition-transform duration-300 ease-in-out shadow-md disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100"
+                  >
+                    <ImageIcon className="w-4 h-4" />
+                    Add More Photos
+                  </button>
+                </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 max-h-[40vh] overflow-y-auto pr-2">
                   {uploadedImagePreviews.map((src, index) => {
                     const isPersisted = src.startsWith('http');

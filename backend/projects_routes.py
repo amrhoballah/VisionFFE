@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from models import Project, User
 from schemas import ProjectCreate, ProjectResponse
 from auth_dependencies import get_current_active_user, require_role_or_admin, require_search_permission
+from gemini_service import get_gemini_service
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -116,6 +117,68 @@ async def delete_project_photo(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Photo not found in project")
     
     return project_to_dict(project)
+
+@router.post("/{project_id}/identify")
+async def identify_project_items(
+    request: Request,
+    project_id: str,
+    files: Optional[List[UploadFile]] = File(None),
+    urls: Optional[str] = Form(None),
+    current_user: User = Depends(require_role_or_admin("designer")),
+    gemini_service = Depends(get_gemini_service)
+):
+    """Identify furniture items from project photos (uploads files if provided, then identifies items using URLs)."""
+    try:
+        project = await Project.find_one(Project.id == ObjectId(project_id), Project.user_id == current_user.id)
+    except:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid project id")
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    
+    uploader = request.app.state.uploader
+    if uploader is None:
+        raise HTTPException(status_code=500, detail="Uploader service not available")
+    
+    # Collect all image URLs
+    image_urls = []
+    
+    # If files are provided, upload them first and add URLs
+    if files:
+        uploaded_urls: List[str] = []
+        for file in files:
+            file_url = await uploader.upload_image(file, f"projects/{project_id}")
+            if file_url:
+                uploaded_urls.append(file_url)
+                image_urls.append(file_url)
+        
+        # Update project with new photos
+        if uploaded_urls:
+            project.photo_urls.extend(uploaded_urls)
+            project.updated_at = datetime.utcnow()
+            await project.save()
+    
+    # Parse and add provided URLs
+    if urls:
+        try:
+            url_list = json.loads(urls) if isinstance(urls, str) else urls
+            image_urls.extend(url_list)
+        except json.JSONDecodeError:
+            # Single URL as string
+            image_urls.append(urls)
+    
+    # Validate that we have at least one image
+    if not image_urls:
+        raise HTTPException(status_code=400, detail="No images provided. Either files or urls must be provided")
+    
+    # Call Gemini service to identify items
+    try:
+        items = await gemini_service.identify_items(image_urls)
+        return {"items": items}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Error identifying items: {e}")
+        raise HTTPException(status_code=500, detail="Failed to identify items")
 
 @router.post("/{project_id}/extracted-items", response_model=ProjectResponse)
 async def save_extracted_items(
