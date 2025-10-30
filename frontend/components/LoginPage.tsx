@@ -59,7 +59,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigateToRegis
                             <label htmlFor="password" className="block text-sm font-medium text-base-content/80 mb-2">Password</label>
                             <input 
                                 type="password" 
-                                id="password" 
+                                id="password"
                                 name="password" 
                                 required 
                                 value={password}
@@ -73,21 +73,29 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigateToRegis
                                 <p>{error}</p>
                             </div>
                         )}
-                        
-                        <div className="pt-2">
-                            <button
-                                type="submit"
+
+                        <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-4 pt-2">
+                             <button
+                                type="button"
+                                onClick={onBackToHome}
+                                className="w-full sm:w-auto px-6 py-3 text-sm font-semibold text-base-content bg-base-300 rounded-lg hover:bg-opacity-80 transition-all"
+                            >
+                                Back to Home
+                            </button>
+                            <button 
+                                type="submit" 
                                 disabled={isLoading}
-                                className="w-full flex items-center justify-center px-8 py-3 font-semibold text-white bg-gradient-to-r from-brand-primary to-brand-secondary rounded-lg hover:scale-105 transform transition-transform duration-300 ease-in-out shadow-lg disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100"
+                                className="w-full sm:w-auto flex items-center justify-center px-8 py-3 font-bold text-white bg-gradient-to-r from-brand-primary to-brand-secondary rounded-lg hover:scale-105 transform transition-transform duration-300 ease-in-out shadow-lg disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100"
                             >
                                 {isLoading ? (
-                                    <div className="w-6 h-6 border-2 border-white/50 border-t-white rounded-full animate-spin"></div>
+                                    <div className="w-5 h-5 border-2 border-white/50 border-t-white rounded-full animate-spin"></div>
                                 ) : (
                                     'Log In'
                                 )}
                             </button>
                         </div>
-                         <div className="text-center text-sm text-base-content/70">
+
+                        <div className="text-center text-sm text-base-content/70 pt-2">
                             <p>
                                 Don't have an account?{' '}
                                 <button type="button" onClick={onNavigateToRegister} className="font-medium text-brand-primary hover:underline">
@@ -97,14 +105,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigateToRegis
                         </div>
                     </form>
                 </main>
-                 <footer className="text-center mt-6">
-                    <button
-                        onClick={onBackToHome}
-                        className="text-sm text-base-content/60 hover:text-base-content hover:underline"
-                    >
-                       &larr; Back to Home
-                    </button>
-                </footer>
             </div>
         </div>
     );

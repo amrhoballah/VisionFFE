@@ -395,7 +395,7 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
               <div className="flex items-center justify-center gap-4 flex-wrap">
                 <button
                   onClick={resetState}
-                  className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-medium text-base-content bg-base-300 rounded-lg hover:bg-opacity-80 transition-all focus:ring-4 focus:outline-none focus:ring-brand-primary/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-medium text-base-content bg-base-300 rounded-lg hover:bg-opacity-80 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={isLoading}
                 >
                   <ResetIcon className="w-5 h-5" />
@@ -404,7 +404,7 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
                 <button
                     onClick={runExtractionProcess}
                     disabled={isLoading || extractedItems.length > 0}
-                    className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-all focus:ring-4 focus:outline-none focus:ring-green-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-brand-primary to-brand-secondary rounded-lg hover:scale-105 transform transition-transform duration-300 ease-in-out shadow-md disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100"
                 >
                     <ImageIcon className="w-5 h-5" />
                     Extract Items
@@ -412,7 +412,7 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
                 <button
                     onClick={handleSendToApi}
                     disabled={isLoading || isSending || selectedItemIds.size === 0}
-                    className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all focus:ring-4 focus:outline-none focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-brand-primary to-brand-secondary rounded-lg hover:scale-105 transform transition-transform duration-300 ease-in-out shadow-md disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100"
                 >
                     {isSending ? (
                         <div className="w-5 h-5 border-2 border-white/50 border-t-white rounded-full animate-spin"></div>
@@ -424,7 +424,7 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
                 <button
                     onClick={handleDownloadZip}
                     disabled={isLoading || extractedItems.length === 0}
-                    className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-brand-primary to-brand-secondary rounded-lg hover:bg-gradient-to-l transition-all focus:ring-4 focus:outline-none focus:ring-brand-primary/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-brand-primary to-brand-secondary rounded-lg hover:scale-105 transform transition-transform duration-300 ease-in-out shadow-md disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100"
                 >
                     <DownloadIcon className="w-5 h-5" />
                     Download All (.zip)
