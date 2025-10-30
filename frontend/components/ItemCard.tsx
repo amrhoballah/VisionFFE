@@ -10,7 +10,7 @@ interface ItemCardProps {
 
 const ItemCard: React.FC<ItemCardProps> = ({ item, isSelected, onSelect }) => {
   const [showResults, setShowResults] = useState(false);
-  const imageUrl = `data:image/png;base64,${item.imageBase64}`;
+  const imageUrl = item.imageUrl || `data:image/png;base64,${item.imageBase64}`;
 
   return (
     <div className="relative">

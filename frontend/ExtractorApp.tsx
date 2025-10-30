@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { ExtractedItem } from './types';
 import { identifyItems, extractItemImage } from './services/geminiService';
 import { authService } from './services/authService';
@@ -31,6 +31,61 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
   
   const { logout, user } = useAuth();
 
+  // Load existing project data when component mounts or projectId changes
+  useEffect(() => {
+    const loadProjectData = async () => {
+      try {
+        const response = await authService.authenticatedFetch(
+          `${config.api.baseUrl}/projects/${projectId}`
+        );
+        if (response.ok) {
+          const project = await response.json();
+          
+          // Load photo URLs and set as previews
+          if (project.photo_urls && project.photo_urls.length > 0) {
+            setUploadedImagePreviews(project.photo_urls);
+          }
+          
+          // Load extracted items
+          if (project.extracted_items && project.extracted_items.length > 0) {
+            // Convert extracted items to ExtractedItem format
+            const items: ExtractedItem[] = await Promise.all(
+              project.extracted_items.map(async (item: any, index: number) => {
+                // Fetch image from URL and convert to base64
+                let imageBase64 = '';
+                try {
+                  const imageResponse = await fetch(item.url);
+                  const blob = await imageResponse.blob();
+                  imageBase64 = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      const base64String = (reader.result as string).split(',')[1];
+                      resolve(base64String);
+                    };
+                    reader.readAsDataURL(blob);
+                  });
+                } catch (error) {
+                  console.error(`Failed to load image from ${item.url}`, error);
+                }
+                
+                return {
+                  id: `${item.name.replace(/\s+/g, '-')}-${Date.now()}-${index}`,
+                  name: item.name,
+                  imageBase64,
+                  imageUrl: item.url
+                };
+              })
+            );
+            setExtractedItems(items);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load project data', error);
+      }
+    };
+
+    loadProjectData();
+  }, [projectId]);
 
   const resetState = useCallback(() => {
     setUploadedFiles([]);
@@ -192,27 +247,38 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
 
     const selectedItems = extractedItems.filter(item => selectedItemIds.has(item.id));
     
-    // Use the backend API endpoint for uploading images
-    const FASTAPI_ENDPOINT = `${config.api.baseUrl}/api/search`;
+    // Use the project-specific search endpoint
+    const FASTAPI_ENDPOINT = `${config.api.baseUrl}/projects/${projectId}/search`;
 
     try {
-        // Convert base64 images to files for upload
-        const files = selectedItems.map(item => {
-            const byteCharacters = atob(item.imageBase64);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: 'image/png' });
-            return new File([blob], `${item.name}.png`, { type: 'image/png' });
-        });
-
-        // Create FormData for multipart upload
-        const formData = new FormData();
-        files.forEach(file => {
-            formData.append('files', file);
-        });
+        // Use URLs if available, otherwise convert to files
+        const hasUrls = selectedItems.every(item => item.imageUrl);
+        
+        let formData: FormData;
+        
+        if (hasUrls) {
+            // Use URL-based search
+            const urls = selectedItems.map(item => item.imageUrl!).filter(Boolean);
+            formData = new FormData();
+            formData.append('urls', JSON.stringify(urls));
+        } else {
+            // Fallback: Convert base64 images to files for upload
+            const files = selectedItems.map(item => {
+                const byteCharacters = atob(item.imageBase64);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: 'image/png' });
+                return new File([blob], `${item.name}.png`, { type: 'image/png' });
+            });
+            
+            formData = new FormData();
+            files.forEach(file => {
+                formData.append('files', file);
+            });
+        }
 
         // Use authenticated fetch
         const response = await authService.authenticatedFetch(FASTAPI_ENDPOINT, {
@@ -232,9 +298,10 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
             setExtractedItems(prevItems => {
                 return prevItems.map(item => {
                     if (selectedItemIds.has(item.id)) {
-                        // Find matching result by filename
+                        // Find matching result by identifier (filename or URL)
+                        const itemIdentifier = item.imageUrl || `${item.name}.png`;
                         const matchingResult = result.results.find((res: any) => 
-                            res.query_filename === `${item.name}.png`
+                            res.query_identifier === itemIdentifier || res.query_identifier === `${item.name}.png`
                         );
                         
                         if (matchingResult && matchingResult.success) {
@@ -251,7 +318,7 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
         
         setApiFeedback({ 
             type: 'success', 
-            message: `Found ${result.total_files} similar items!` 
+            message: `Found results for ${result.total_queries} item(s)!` 
         });
         setSelectedItemIds(new Set()); // Clear selection on success
 
