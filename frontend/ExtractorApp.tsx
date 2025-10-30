@@ -12,7 +12,13 @@ import { DownloadIcon, ResetIcon, ImageIcon, SendIcon } from './components/Icons
 // Declare JSZip for TypeScript since it's loaded from a CDN
 declare var JSZip: any;
 
-const ExtractorApp: React.FC = () => {
+interface ExtractorAppProps {
+  projectId: string;
+  projectName: string;
+  onChangeProject: () => void;
+}
+
+const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onChangeProject }) => {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [uploadedImagePreviews, setUploadedImagePreviews] = useState<string[]>([]);
   const [extractedItems, setExtractedItems] = useState<ExtractedItem[]>([]);
@@ -41,11 +47,24 @@ const ExtractorApp: React.FC = () => {
     setApiFeedback(null);
   }, []);
 
-  const handleFileUpload = (files: FileList) => {
+  const handleFileUpload = async (files: FileList) => {
     resetState();
     const fileArray = Array.from(files);
     setUploadedFiles(fileArray);
     setUploadedImagePreviews(fileArray.map(file => URL.createObjectURL(file)));
+    // Upload to backend project for persistence
+    try {
+      const form = new FormData();
+      fileArray.forEach(f => form.append('files', f));
+      const endpoint = `${config.api.baseUrl}/projects/${projectId}/photos`;
+      const res = await authService.authenticatedFetch(endpoint, { method: 'POST', body: form });
+      if (!res.ok) {
+        // Non-blocking: allow analysis to proceed even if persistence fails
+        console.warn('Failed to persist photos to project');
+      }
+    } catch (e) {
+      console.warn('Upload to project failed', e);
+    }
   };
   
   const runExtractionProcess = useCallback(async () => {
@@ -236,15 +255,24 @@ const ExtractorApp: React.FC = () => {
                 </h1>
             </div>
             <div className="flex items-center justify-between max-w-2xl mx-auto mb-4">
-                <div className="text-sm text-base-content/70">
-                    Welcome, {user?.username || 'User'}
+                <div className="text-left text-sm text-base-content/70">
+                    <div>Welcome, {user?.username || 'User'}</div>
+                    <div className="mt-1 text-base-content">Project: <span className="font-semibold">{projectName}</span></div>
                 </div>
-                <button
-                    onClick={logout}
-                    className="px-4 py-2 text-sm font-medium text-base-content bg-base-300 rounded-lg hover:bg-opacity-80 transition-all"
-                >
-                    Logout
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={onChangeProject}
+                        className="px-4 py-2 text-sm font-medium text-base-content bg-base-300 rounded-lg hover:bg-opacity-80 transition-all"
+                    >
+                        Change project
+                    </button>
+                    <button
+                        onClick={logout}
+                        className="px-4 py-2 text-sm font-medium text-base-content bg-base-300 rounded-lg hover:bg-opacity-80 transition-all"
+                    >
+                        Logout
+                    </button>
+                </div>
             </div>
             <p className="text-base-content/70 max-w-2xl mx-auto">
             Upload multiple angles of a room to automatically detect, isolate, and download each piece of furniture.

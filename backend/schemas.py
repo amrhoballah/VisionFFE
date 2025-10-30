@@ -91,6 +91,22 @@ class PermissionResponse(PermissionBase):
     
     model_config = ConfigDict(from_attributes=True)
 
+# Project schemas
+class ProjectBase(BaseModel):
+    name: str
+
+class ProjectCreate(ProjectBase):
+    pass
+
+class ProjectResponse(ProjectBase):
+    id: str
+    user_id: str
+    photo_urls: List[str] = []
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    model_config = ConfigDict(from_attributes=True)
+
 # Authentication schemas
 class LoginRequest(BaseModel):
     username: str

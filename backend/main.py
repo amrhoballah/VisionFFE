@@ -16,6 +16,7 @@ import boto3
 from database import init_database, init_default_data, close_database
 from auth_routes import router as auth_router
 from admin_routes import router as admin_router
+from projects_routes import router as projects_router
 # from gemini_routes import router as gemini_router
 from auth_dependencies import require_search_permission, require_upload_permission, require_stats_permission
 
@@ -132,6 +133,7 @@ app.add_middleware(
 # Include routers
 app.include_router(auth_router)
 app.include_router(admin_router)
+app.include_router(projects_router)
 # app.include_router(gemini_router)
 
 @app.get("/")

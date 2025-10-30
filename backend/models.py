@@ -91,3 +91,19 @@ class Token(Document):
             "is_revoked",
             "expires_at"
         ]
+
+class Project(Document):
+    name: Indexed(str)
+    user_id: ObjectId
+    photo_urls: List[str] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
+    
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
+    class Settings:
+        name = "projects"
+        indexes = [
+            "user_id",
+            "name"
+        ]
