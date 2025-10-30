@@ -102,6 +102,7 @@ class ProjectResponse(ProjectBase):
     id: str
     user_id: str
     photo_urls: List[str] = []
+    extracted_items: List[dict] = []
     created_at: datetime
     updated_at: Optional[datetime] = None
     

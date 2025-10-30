@@ -96,6 +96,7 @@ class Project(Document):
     name: Indexed(str)
     user_id: ObjectId
     photo_urls: List[str] = Field(default_factory=list)
+    extracted_items: List[dict] = Field(default_factory=list)  # {name, url}
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: Optional[datetime] = None
     

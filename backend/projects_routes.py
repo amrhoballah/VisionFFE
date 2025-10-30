@@ -1,13 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request, status
-from typing import List
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request, status, Form
+from typing import List, Optional
 from bson import ObjectId
 from datetime import datetime
 import os
 import uuid
+import json
 
 from models import Project, User
 from schemas import ProjectCreate, ProjectResponse
-from auth_dependencies import get_current_active_user, require_role_or_admin
+from auth_dependencies import get_current_active_user, require_role_or_admin, require_search_permission
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -17,6 +18,7 @@ def project_to_dict(project: Project) -> ProjectResponse:
         name=project.name,
         user_id=str(project.user_id),
         photo_urls=project.photo_urls,
+        extracted_items=project.extracted_items,
         created_at=project.created_at,
         updated_at=project.updated_at,
     )
@@ -60,29 +62,190 @@ async def upload_project_photos(
     if not project:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
-    r2_client = request.app.state.r2
-    bucket = request.app.state.r2_bucket
-    if not r2_client or not bucket:
-        raise HTTPException(status_code=500, detail="Storage not configured")
 
+    uploader = request.app.state.uploader
+    if uploader is None:
+        raise HTTPException(status_code=500, detail="Uploader service not available")
+    
     uploaded_urls: List[str] = []
-    base_url = os.getenv("R2_URL")
     for file in files:
-        file_bytes = await file.read()
-        ext = os.path.splitext(file.filename)[1]
-        key = f"projects/{project_id}/{uuid.uuid4().hex}{ext}"
-        r2_client.put_object(
-            Bucket=bucket,
-            Key=key,
-            Body=file_bytes,
-            ContentType=file.content_type
-        )
-        file_url = f"{base_url}/{key}" if base_url else key
-        uploaded_urls.append(file_url)
+        file_url = await uploader.upload_image(file, f"projects/{project_id}")
+        if file_url:
+            uploaded_urls.append(file_url)
 
     project.photo_urls.extend(uploaded_urls)
     project.updated_at = datetime.utcnow()
     await project.save()
     return project_to_dict(project)
 
+@router.post("/{project_id}/extracted-items", response_model=ProjectResponse)
+async def save_extracted_items(
+    request: Request,
+    project_id: str,
+    items: List[dict],
+    current_user: User = Depends(require_role_or_admin("designer"))
+):
+    """Save extracted items (name + base64 image) to storage and record under project."""
+    try:
+        project = await Project.find_one(Project.id == ObjectId(project_id), Project.user_id == current_user.id)
+    except:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid project id")
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+
+    uploader = request.app.state.uploader
+    if uploader is None:
+        raise HTTPException(status_code=500, detail="Uploader service not available")
+    
+    saved = []
+    for it in items:
+        name = (it.get("name") or "item").strip()[:128]
+        b64 = it.get("base64")
+        if not b64:
+            continue
+        try:
+            data = bytes.fromhex("")  # dummy to keep syntax; will be replaced
+        except Exception:
+            data = None
+        try:
+            import base64 as _b64
+            data = _b64.b64decode(b64)
+        except Exception:
+            continue
+        
+        url = await uploader.upload_bytes(data, f"projects/{project_id}/extracted")
+        if url:
+            saved.append({"name": name, "url": url})
+
+    if saved:
+        project.extracted_items.extend(saved)
+        project.updated_at = datetime.utcnow()
+        await project.save()
+
+    return project_to_dict(project)
+
+
+@router.post("/{project_id}/search")
+async def search_similar(
+    request: Request, 
+    files: Optional[List[UploadFile]] = File(None), 
+    urls: Optional[str] = Form(None),
+    top_k: int = Form(5),
+    current_user = Depends(require_search_permission)
+):
+    embedder = request.app.state.embedder
+    pinecone_index = request.app.state.pinecone_index
+    uploader = request.app.state.uploader
+    
+    if embedder is None:
+        raise HTTPException(status_code=500, detail="Model not loaded")
+    if pinecone_index is None:
+        raise HTTPException(status_code=500, detail="Pinecone not connected")
+    
+    # Parse URLs if provided
+    url_list = []
+    if urls:
+        try:
+            url_list = json.loads(urls) if isinstance(urls, str) else urls
+        except json.JSONDecodeError:
+            url_list = [urls]  # Single URL as string
+    
+    # Validate that at least one input is provided
+    if not files and not url_list:
+        raise HTTPException(status_code=400, detail="Either files or urls must be provided")
+    
+    # Validate top_k
+    if top_k < 1 or top_k > 100:
+        raise HTTPException(status_code=400, detail="top_k must be between 1 and 100")
+    
+    try:
+        all_results = []
+        
+        # Process files if provided
+        if files:
+            if uploader is None:
+                raise HTTPException(status_code=500, detail="Uploader service not available")
+            for file in files:
+                query_embedding = await uploader.search_item(file)
+
+                if query_embedding is None or query_embedding is False:
+                    all_results.append({
+                        "query_identifier": file.filename,
+                        "success": False,
+                        "error": "Failed to process image",
+                        "results": []
+                    })
+                    continue
+                
+                results = pinecone_index.query(
+                    vector=query_embedding.tolist(),
+                    top_k=top_k,
+                    include_metadata=True
+                )
+                
+                formatted_results = []
+                for match in results['matches']:
+                    result = {
+                        "id": match['id'],
+                        "similarity_score": float(match['score']),
+                        "metadata": match.get('metadata', {}),
+                        "image_path": match['metadata'].get('image_path', ''),
+                        "filename": match['metadata'].get('filename', '')
+                    }
+                    formatted_results.append(result)
+                
+                all_results.append({
+                    "query_identifier": file.filename,
+                    "success": True,
+                    "results": formatted_results
+                })
+        
+        # Process URLs if provided
+        if url_list:
+            for url in url_list:
+                query_embedding = embedder.get_embedding(url)
+
+                if query_embedding is None:
+                    all_results.append({
+                        "query_identifier": url,
+                        "success": False,
+                        "error": "Failed to process image from URL",
+                        "results": []
+                    })
+                    continue
+                
+                results = pinecone_index.query(
+                    vector=query_embedding.tolist(),
+                    top_k=top_k,
+                    include_metadata=True
+                )
+                
+                formatted_results = []
+                for match in results['matches']:
+                    result = {
+                        "id": match['id'],
+                        "similarity_score": float(match['score']),
+                        "metadata": match.get('metadata', {}),
+                        "image_path": match['metadata'].get('image_path', ''),
+                        "filename": match['metadata'].get('filename', '')
+                    }
+                    formatted_results.append(result)
+                
+                all_results.append({
+                    "query_identifier": url,
+                    "success": True,
+                    "results": formatted_results
+                })
+        
+        total_queries = (len(files) if files else 0) + len(url_list)
+        
+        return {
+            "success": True,
+            "total_queries": total_queries,
+            "results": all_results,
+            "total_database_size": pinecone_index.describe_index_stats()['total_vector_count']
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 

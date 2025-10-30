@@ -8,7 +8,7 @@ class ImageUploader:
         self.embedder = embedder
         self.index = index
 
-    async def add_furniture_item(self, file, metadata):
+    async def upload_image(self, file, folder_name):
         try:
             file_bytes = await file.read()
             # Generate unique filename with same extension
@@ -16,12 +16,35 @@ class ImageUploader:
             unique_name = f"{uuid.uuid4().hex}{file_ext}"
             self.s3_client.put_object(
                 Bucket=self.bucket_name,
-                Key=unique_name,
+                Key=f"{folder_name}/{unique_name}",
                 Body=file_bytes,
                 ContentType=file.content_type
             )
 
-            file_url = f"{os.getenv('R2_URL')}/{unique_name}"
+            file_url = f"{os.getenv('R2_URL')}/{f"{folder_name}/{unique_name}"}"
+            return file_url
+        except Exception as e:
+            print(f"Failed to upload image {file.filename}: {e}")
+            
+    async def upload_bytes(self, data: bytes, folder_name: str, filename: str = "image.jpg"):
+        """Upload raw bytes data to S3 storage"""
+        try:
+            unique_name = f"{uuid.uuid4().hex}.jpg"
+            self.s3_client.put_object(
+                Bucket=self.bucket_name,
+                Key=f"{folder_name}/{unique_name}",
+                Body=data,
+                ContentType="image/jpeg"
+            )
+            file_url = f"{os.getenv('R2_URL')}/{folder_name}/{unique_name}"
+            return file_url
+        except Exception as e:
+            print(f"Failed to upload bytes: {e}")
+            return None
+
+    async def add_furniture_item(self, file, metadata):
+        try:
+            file_url = await self.upload_image(file, "furniture")
             
             embedding = self.embedder.get_embedding(file_url)
             if embedding is None:

@@ -103,6 +103,7 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
         return;
       }
 
+      const itemsToPersist: { name: string; base64: string }[] = [];
       for (let i = 0; i < itemNames.length; i++) {
         const name = itemNames[i];
         setLoadingMessage(`Extracting "${name}"... (${i + 1} of ${itemNames.length})`);
@@ -112,8 +113,29 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
             ...prev,
             { id: `${name.replace(/\s+/g, '-')}-${Date.now()}`, name, imageBase64: itemImageBase64 }
           ]);
+          // Queue for backend persistence under project
+          itemsToPersist.push({ name, base64: itemImageBase64 });
         } catch (extractionError) {
             console.warn(`Could not extract "${name}". Skipping.`);
+        }
+      }
+
+      // Persist extracted items to backend under this project
+      if (itemsToPersist.length > 0) {
+        try {
+          const response = await authService.authenticatedFetch(
+            `${config.api.baseUrl}/projects/${projectId}/extracted-items`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(itemsToPersist),
+            }
+          );
+          if (!response.ok) {
+            console.warn('Failed to persist extracted items');
+          }
+        } catch (e) {
+          console.warn('Persisting extracted items failed', e);
         }
       }
     } catch (err: any) {
