@@ -224,47 +224,55 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
 
       // Prepare images for extraction
       setLoadingMessage('Preparing images for extraction...');
-      let images: {base64: string, mimeType: string}[] = [];
+      // let images: {base64: string, mimeType: string}[] = [];
       
-      if (hasFiles) {
-        // Get base64 from files
-        const imagePromises = uploadedFiles.map(file => {
-          return new Promise<{base64: string, mimeType: string}>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onloadend = () => {
-              const base64String = (reader.result as string).split(',')[1];
-              resolve({ base64: base64String, mimeType: file.type });
-            };
-            reader.onerror = (error) => reject(error);
-          });
-        });
-        images = await Promise.all(imagePromises);
-      } else if (hasUrls) {
-        // For URLs, we need to fetch and convert to base64
-        const urlList = uploadedImagePreviews.filter(url => url.startsWith('http'));
-        const imagePromises = urlList.map(async (url) => {
-          const response = await fetch(url);
-          const blob = await response.blob();
-          return new Promise<{base64: string, mimeType: string}>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(blob);
-            reader.onloadend = () => {
-              const base64String = (reader.result as string).split(',')[1];
-              resolve({ base64: base64String, mimeType: blob.type });
-            };
-            reader.onerror = (error) => reject(error);
-          });
-        });
-        images = await Promise.all(imagePromises);
-      }
+      // if (hasFiles) {
+      //   // Get base64 from files
+      //   const imagePromises = uploadedFiles.map(file => {
+      //     return new Promise<{base64: string, mimeType: string}>((resolve, reject) => {
+      //       const reader = new FileReader();
+      //       reader.readAsDataURL(file);
+      //       reader.onloadend = () => {
+      //         const base64String = (reader.result as string).split(',')[1];
+      //         resolve({ base64: base64String, mimeType: file.type });
+      //       };
+      //       reader.onerror = (error) => reject(error);
+      //     });
+      //   });
+      //   images = await Promise.all(imagePromises);
+      // } else if (hasUrls) {
+      //   // For URLs, we need to fetch and convert to base64
+      //   const urlList = uploadedImagePreviews.filter(url => url.startsWith('http'));
+      //   const imagePromises = urlList.map(async (url) => {
+      //     const response = await fetch(url);
+      //     const blob = await response.blob();
+      //     return new Promise<{base64: string, mimeType: string}>((resolve, reject) => {
+      //       const reader = new FileReader();
+      //       reader.readAsDataURL(blob);
+      //       reader.onloadend = () => {
+      //         const base64String = (reader.result as string).split(',')[1];
+      //         resolve({ base64: base64String, mimeType: blob.type });
+      //       };
+      //       reader.onerror = (error) => reject(error);
+      //     });
+      //   });
+      //   images = await Promise.all(imagePromises);
+      // }
 
       const itemsToPersist: { name: string; base64: string }[] = [];
       for (let i = 0; i < itemNames.length; i++) {
+        newFormData = formData;
         const name = itemNames[i];
+        newFormData.append('item_name', name);
         setLoadingMessage(`Extracting "${name}"... (${i + 1} of ${itemNames.length})`);
         try {
-          const itemImageBase64 = await extractItemImage(images, name);
+          const itemImageBase64 = await authService.authenticatedFetch(
+            `${config.api.baseUrl}/projects/${projectId}/extract`,
+            {
+              method: 'POST',
+              body: formData,
+            }
+          );
           setExtractedItems(prev => [
             ...prev,
             { id: `${name.replace(/\s+/g, '-')}-${Date.now()}`, name, imageBase64: itemImageBase64 }
@@ -276,24 +284,7 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
         }
       }
 
-      // Persist extracted items to backend under this project
-      if (itemsToPersist.length > 0) {
-        try {
-          const response = await authService.authenticatedFetch(
-            `${config.api.baseUrl}/projects/${projectId}/extracted-items`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(itemsToPersist),
-            }
-          );
-          if (!response.ok) {
-            console.warn('Failed to persist extracted items');
-          }
-        } catch (e) {
-          console.warn('Persisting extracted items failed', e);
-        }
-      }
+
     } catch (err: any) {
         setError(err.message || 'An unexpected error occurred.');
     } finally {
