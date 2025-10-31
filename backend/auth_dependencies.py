@@ -128,6 +128,17 @@ def require_role(role_name: str):
     
     return role_checker
 
+def require_role_or_admin(role_name: str):
+    """Decorator to require a specific role or admin."""
+    async def role_checker(current_user: User = Depends(get_current_active_user)) -> User:
+        roles, _ = await get_user_roles_and_permissions(current_user)
+        is_admin = any(role.name == "admin" for role in roles)
+        has_role = any(role.name == role_name for role in roles)
+        if not (is_admin or has_role):
+            raise PermissionError(f"Role required: {role_name} or admin")
+        return current_user
+    return role_checker
+
 async def require_admin(current_user: User = Depends(get_current_active_user)) -> User:
     """Require admin role."""
     roles, _ = await get_user_roles_and_permissions(current_user)

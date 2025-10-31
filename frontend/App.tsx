@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import HomePage from './components/HomePage';
 import ExtractorApp from './ExtractorApp';
+import ProjectsPage from './components/ProjectsPage';
 import RegistrationPage from './components/RegistrationPage';
 import LoginPage from './components/LoginPage';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import type { Project } from './services/projectService';
 
 const AppContent: React.FC = () => {
   const [view, setView] = useState<'home' | 'register' | 'login'>('home');
-  const { isAuthenticated, isLoading } = useAuth();
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   // Show loading spinner while checking authentication
   if (isLoading) {
@@ -18,9 +21,18 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // If user is authenticated, show the main application.
-  if (isAuthenticated) {
-    return <ExtractorApp />;
+  // If user is authenticated and is designer or admin, show the main application.
+  if (isAuthenticated && user?.roles?.some(r => r.name === 'designer' || r.name === 'admin')) {
+    if (!selectedProject) {
+      return <ProjectsPage onSelectProject={(p) => setSelectedProject(p)} />;
+    }
+    return (
+      <ExtractorApp
+        projectId={selectedProject.id}
+        projectName={selectedProject.name}
+        onChangeProject={() => setSelectedProject(null)}
+      />
+    );
   }
 
   // Otherwise, show the correct page based on the view state.
