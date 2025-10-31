@@ -261,7 +261,7 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
 
       const itemsToPersist: { name: string; base64: string }[] = [];
       for (let i = 0; i < itemNames.length; i++) {
-        newFormData = formData;
+        let newFormData = formData;
         const name = itemNames[i];
         newFormData.append('item_name', name);
         setLoadingMessage(`Extracting "${name}"... (${i + 1} of ${itemNames.length})`);
@@ -270,7 +270,7 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
             `${config.api.baseUrl}/projects/${projectId}/extract`,
             {
               method: 'POST',
-              body: formData,
+              body: newFormData,
             }
           );
           setExtractedItems(prev => [
