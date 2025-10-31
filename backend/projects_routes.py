@@ -4,14 +4,12 @@ from bson import ObjectId
 from datetime import datetime
 import requests
 import base64 as b64
-import os
-import uuid
 import json
 from pydantic import BaseModel
 
 from models import Project, User
 from schemas import ProjectCreate, ProjectResponse
-from auth_dependencies import get_current_active_user, require_role_or_admin, require_search_permission
+from auth_dependencies import require_role_or_admin, require_search_permission
 from gemini_service import get_gemini_service
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -248,54 +246,6 @@ async def extract_project_items(
         raise HTTPException(status_code=500, detail="Failed to extract item")
 
 
-# @router.post("/{project_id}/extracted-items", response_model=ProjectResponse)
-# async def save_extracted_items(
-#     request: Request,
-#     project_id: str,
-#     items: List[dict],
-#     current_user: User = Depends(require_role_or_admin("designer"))
-# ):
-#     """Save extracted items (name + base64 image) to storage and record under project."""
-#     try:
-#         project = await Project.find_one(Project.id == ObjectId(project_id), Project.user_id == current_user.id)
-#     except:
-#         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid project id")
-#     if not project:
-#         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
-
-
-#     uploader = request.app.state.uploader
-#     if uploader is None:
-#         raise HTTPException(status_code=500, detail="Uploader service not available")
-    
-#     saved = []
-#     for it in items:
-#         name = (it.get("name") or "item").strip()[:128]
-#         b64 = it.get("base64")
-#         if not b64:
-#             continue
-#         try:
-#             data = bytes.fromhex("")  # dummy to keep syntax; will be replaced
-#         except Exception:
-#             data = None
-#         try:
-#             import base64 as _b64
-#             data = _b64.b64decode(b64)
-#         except Exception:
-#             continue
-        
-#         url = await uploader.upload_bytes(data, f"projects/{project_id}/extracted")
-#         if url:
-#             saved.append({"name": name, "url": url})
-
-#     if saved:
-#         project.extracted_items.extend(saved)
-#         project.updated_at = datetime.utcnow()
-#         await project.save()
-
-#     return project_to_dict(project)
-
-
 @router.post("/{project_id}/search")
 async def search_similar(
     request: Request, 
@@ -342,7 +292,6 @@ async def search_similar(
         if url_list:
             for url in url_list:
                 query_embedding = embedder.get_embedding(url)
-
                 if query_embedding is None:
                     all_results.append({
                         "query_identifier": url,
@@ -352,20 +301,44 @@ async def search_similar(
                     })
                     continue
                 
-                results = pinecone_index.query(
-                    vector=query_embedding.tolist(),
-                    top_k=top_k,
-                    include_metadata=True
+                # For Embedder 3
+                # results = pinecone_index.query(
+                #     vector=query_embedding.tolist(),
+                #     top_k=top_k,
+                #     include_metadata=True
+                # )
+
+                # For Embedder 2
+                results = pinecone_index.search(
+                    namespace="__default__", 
+                    query={
+                        "inputs": {"text": query_embedding}, 
+                        "top_k": top_k
+                    }
                 )
                 
+                print(results)
+
                 formatted_results = []
-                for match in results['matches']:
+                # For Embedder 3
+                # for match in results['matches']:
+                #     result = {
+                #         "id": match['id'],
+                #         "similarity_score": float(match['score']),
+                #         "metadata": match.get('metadata', {}),
+                #         "image_path": match['metadata'].get('image_path', ''),
+                #         "filename": match['metadata'].get('filename', '')
+                #     }
+                #     formatted_results.append(result)
+
+                # For Embedder 2
+                for match in results['result'].get('hits', []):
                     result = {
-                        "id": match['id'],
-                        "similarity_score": float(match['score']),
-                        "metadata": match.get('metadata', {}),
-                        "image_path": match['metadata'].get('image_path', ''),
-                        "filename": match['metadata'].get('filename', '')
+                        "id": match['_id'],
+                        "similarity_score": float(match['_score']),
+                        "metadata": match.get('fields', {}),
+                        "image_path": match['fields'].get('image_path', ''),
+                        "filename": match['fields'].get('filename', '')
                     }
                     formatted_results.append(result)
                 

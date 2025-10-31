@@ -21,7 +21,7 @@ image = (
             "boto3",
             "botocore",
             "pinecone[asyncio]",
-            "transformers",
+            "transformers==4.49.0",
             "huggingface-hub",
             "open-clip-torch",
             # Authentication dependencies
@@ -34,7 +34,8 @@ image = (
             "email-validator",
             "beanie",
             "certifi",
-            "google-genai"
+            "google-genai",
+            "einops"
         ]
     )
     # ✅ Copy everything in your current folder into /root/app

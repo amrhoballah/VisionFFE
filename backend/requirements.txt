@@ -3,7 +3,7 @@ uvicorn[standard]
 python-multipart
 torch
 torchvision
-transformers
+transformers==4.49.0
 timm
 pillow
 numpy
@@ -25,3 +25,4 @@ email-validator
 beanie
 certifi
 google-genai
+einops
