@@ -9,7 +9,7 @@ import base64
 import json
 
 from gemini_service import get_gemini_service, GeminiService, ImageInput
-from auth_dependencies import get_current_active_user
+from auth_dependencies import get_current_active_user, require_role_or_admin
 from models import User
 
 router = APIRouter(prefix="/api/gemini", tags=["gemini"])
@@ -35,7 +35,7 @@ class ExtractItemResponse(BaseModel):
 async def identify_items(
     request: IdentifyItemsRequest,
     gemini_service: GeminiService = Depends(get_gemini_service),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_role_or_admin("designer"))
 ):
     """
     Analyze room images and identify all furniture/decor items.
@@ -60,7 +60,7 @@ async def identify_items(
 async def extract_item(
     request: ExtractItemRequest,
     gemini_service: GeminiService = Depends(get_gemini_service),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_role_or_admin("designer"))
 ):
     """
     Extract a specific item from room images as an isolated image.

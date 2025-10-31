@@ -6,7 +6,7 @@ from bson import ObjectId
 from models import User, Role, Token
 from schemas import (
     LoginRequest, RegisterRequest, TokenResponse, RefreshTokenRequest,
-    PasswordChangeRequest, UserResponse, UserCreate, UserUpdate
+    PasswordChangeRequest, UserResponse, UserCreate, UserUpdate, UserWithRoles, RoleResponse
 )
 from auth_utils import (
     verify_password, get_password_hash, create_access_token, create_refresh_token,
@@ -227,7 +227,21 @@ async def change_password(
     
     return {"message": "Password changed successfully. Please login again."}
 
-@router.get("/me", response_model=UserResponse)
+@router.get("/me", response_model=UserWithRoles)
 async def get_current_user_info(current_user: User = Depends(get_current_active_user)):
-    """Get current user information."""
-    return user_to_dict(current_user)
+    """Get current user information with roles."""
+    user_dict = user_to_dict(current_user)
+    roles = []
+    if current_user.role_ids:
+        roles = await Role.find({"_id": {"$in": current_user.role_ids}}).to_list()
+    # Map roles to RoleResponse-like dicts
+    user_dict["roles"] = [
+        {
+            "id": str(role.id),
+            "name": role.name,
+            "description": role.description,
+            "created_at": role.created_at,
+            "permission_ids": [str(pid) for pid in role.permission_ids],
+        } for role in roles
+    ]
+    return user_dict

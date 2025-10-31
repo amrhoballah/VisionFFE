@@ -39,7 +39,7 @@ export async function identifyItems(
         ],
       },
       config: {
-        temperature: 0.5,
+        temperature: 0.3,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,

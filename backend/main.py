@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Request, Depends
+from fastapi import FastAPI, File, UploadFile, HTTPException, Request, Depends, Form
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 import torch
@@ -16,6 +16,7 @@ import boto3
 from database import init_database, init_default_data, close_database
 from auth_routes import router as auth_router
 from admin_routes import router as admin_router
+from projects_routes import router as projects_router
 # from gemini_routes import router as gemini_router
 from auth_dependencies import require_search_permission, require_upload_permission, require_stats_permission
 
@@ -132,6 +133,7 @@ app.add_middleware(
 # Include routers
 app.include_router(auth_router)
 app.include_router(admin_router)
+app.include_router(projects_router)
 # app.include_router(gemini_router)
 
 @app.get("/")
@@ -153,72 +155,6 @@ async def root(request: Request):
         "device": str(device)
     }
 
-@app.post("/api/search")
-async def search_similar(
-    request: Request, 
-    files: List[UploadFile] = File(...), 
-    top_k: int = 5,
-    current_user = Depends(require_search_permission)
-):
-    embedder = request.app.state.embedder
-    pinecone_index = request.app.state.pinecone_index
-    uploader = request.app.state.uploader
-    
-    if embedder is None:
-        raise HTTPException(status_code=500, detail="Model not loaded")
-    if pinecone_index is None:
-        raise HTTPException(status_code=500, detail="Pinecone not connected")
-    if uploader is None:
-        raise HTTPException(status_code=500, detail="Uploader service not available")
-    
-    try:
-        all_results = []
-        print(files)
-        # Process each file
-        for file in files:
-            query_embedding = await uploader.search_item(file)
-
-            if query_embedding is None:
-                # If processing fails for one image, continue with others
-                all_results.append({
-                    "query_filename": file.filename,
-                    "success": False,
-                    "error": "Failed to process image",
-                    "results": []
-                })
-                continue
-            
-            results = pinecone_index.query(
-                vector=query_embedding.tolist(),
-                top_k=top_k,
-                include_metadata=True
-            )
-            
-            formatted_results = []
-            for match in results['matches']:
-                result = {
-                    "id": match['id'],
-                    "similarity_score": float(match['score']),
-                    "metadata": match.get('metadata', {}),
-                    "image_path": match['metadata'].get('image_path', ''),
-                    "filename": match['metadata'].get('filename', '')
-                }
-                formatted_results.append(result)
-            
-            all_results.append({
-                "query_filename": file.filename,
-                "success": True,
-                "results": formatted_results
-            })
-        
-        return {
-            "success": True,
-            "total_files": len(files),
-            "results": all_results,
-            "total_database_size": pinecone_index.describe_index_stats()['total_vector_count']
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 @app.post("/api/upload")
 async def upload_images(

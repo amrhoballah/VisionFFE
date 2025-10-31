@@ -41,6 +41,7 @@ export interface UserResponse {
   is_verified: boolean;
   created_at: string;
   role_ids: string[];
+  roles?: { id: string; name: string }[];
 }
 
 export interface AuthError {

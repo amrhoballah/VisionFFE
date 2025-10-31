@@ -1,7 +1,7 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 from auth_config import auth_settings
-from models import User, Role, Permission, Token
+from models import User, Role, Permission, Token, Project
 import asyncio
 import ssl
 import certifi
@@ -58,7 +58,7 @@ async def init_database():
         # Initialize Beanie with the database
         await init_beanie(
             database=client[auth_settings.mongodb_database],
-            document_models=[User, Role, Permission, Token]
+            document_models=[User, Role, Permission, Token, Project]
         )
 
         print("✅ MongoDB database initialized")
@@ -149,10 +149,17 @@ async def init_default_data():
             permission_ids=[permissions[4].id, permissions[5].id]
         )
 
+        designer_role = Role(
+            name="designer",
+            description="Designer role with extractor access",
+            permission_ids=[permissions[1].id, permissions[2].id, permissions[3].id]
+        )
+
         # Insert roles
         await admin_role.insert()
         await user_role.insert()
         await viewer_role.insert()
+        await designer_role.insert()
 
         print("✅ Default roles and permissions created")
 

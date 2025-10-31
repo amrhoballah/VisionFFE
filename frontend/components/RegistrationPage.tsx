@@ -246,7 +246,7 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ onBackToHome, onNav
                             <button
                                 type="submit"
                                 disabled={isLoading}
-                                className="w-full sm:w-auto px-8 py-3 font-semibold text-white bg-gradient-to-r from-brand-primary to-brand-secondary rounded-lg hover:scale-105 transform transition-transform duration-300 ease-in-out shadow-lg disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100"
+                                className="w-full sm:w-auto px-8 py-3 font-bold text-white bg-gradient-to-r from-brand-primary to-brand-secondary rounded-lg hover:scale-105 transform transition-transform duration-300 ease-in-out shadow-lg disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100"
                             >
                                 {isLoading ? (
                                     <div className="w-5 h-5 border-2 border-white/50 border-t-white rounded-full animate-spin"></div>
