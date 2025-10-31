@@ -299,10 +299,18 @@ async def extract_project_items(
 @router.post("/{project_id}/search")
 async def search_similar(
     request: Request, 
+    project_id: str,
     urls: Optional[str] = Form(None),
     top_k: int = Form(5),
     current_user = Depends(require_search_permission)
 ):
+    try:
+        project = await Project.find_one(Project.id == ObjectId(project_id), Project.user_id == current_user.id)
+    except:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid project id")
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
     embedder = request.app.state.embedder
     pinecone_index = request.app.state.pinecone_index
     
