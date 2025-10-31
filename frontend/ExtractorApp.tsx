@@ -275,7 +275,7 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
           const imageResponseData = await imageResponse.json();
           setExtractedItems(prev => [
             ...prev,
-            { id: `${name.replace(/\s+/g, '-')}-${Date.now()}`, name, url: imageResponseData.imageUrl }
+            { id: `${name.replace(/\s+/g, '-')}-${Date.now()}`, name, imageUrl: imageResponseData.imageUrl }
           ]);
         } catch (extractionError) {
             console.warn(`Could not extract "${name}". Skipping.`);

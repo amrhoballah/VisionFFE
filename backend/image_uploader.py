@@ -41,7 +41,7 @@ class ImageUploader:
                 ".gif": "image/gif",
                 ".webp": "image/webp"
             }
-            content_type = "image/png",
+            content_type = "image/png"
             
             self.s3_client.put_object(
                 Bucket=self.bucket_name,
