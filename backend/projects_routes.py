@@ -299,14 +299,12 @@ async def extract_project_items(
 @router.post("/{project_id}/search")
 async def search_similar(
     request: Request, 
-    files: Optional[List[UploadFile]] = File(None), 
     urls: Optional[str] = Form(None),
     top_k: int = Form(5),
     current_user = Depends(require_search_permission)
 ):
     embedder = request.app.state.embedder
     pinecone_index = request.app.state.pinecone_index
-    uploader = request.app.state.uploader
     
     if embedder is None:
         raise HTTPException(status_code=500, detail="Model not loaded")
@@ -331,45 +329,6 @@ async def search_similar(
     
     try:
         all_results = []
-        
-        # Process files if provided
-        if files:
-            if uploader is None:
-                raise HTTPException(status_code=500, detail="Uploader service not available")
-            for file in files:
-                query_embedding = await uploader.search_item(file)
-
-                if query_embedding is None or query_embedding is False:
-                    all_results.append({
-                        "query_identifier": file.filename,
-                        "success": False,
-                        "error": "Failed to process image",
-                        "results": []
-                    })
-                    continue
-                
-                results = pinecone_index.query(
-                    vector=query_embedding.tolist(),
-                    top_k=top_k,
-                    include_metadata=True
-                )
-                
-                formatted_results = []
-                for match in results['matches']:
-                    result = {
-                        "id": match['id'],
-                        "similarity_score": float(match['score']),
-                        "metadata": match.get('metadata', {}),
-                        "image_path": match['metadata'].get('image_path', ''),
-                        "filename": match['metadata'].get('filename', '')
-                    }
-                    formatted_results.append(result)
-                
-                all_results.append({
-                    "query_identifier": file.filename,
-                    "success": True,
-                    "results": formatted_results
-                })
         
         # Process URLs if provided
         if url_list:

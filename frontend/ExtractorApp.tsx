@@ -349,23 +349,6 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
             const urls = selectedItems.map(item => item.imageUrl!).filter(Boolean);
             formData = new FormData();
             formData.append('urls', JSON.stringify(urls));
-        } else {
-            // Fallback: Convert base64 images to files for upload
-            const files = selectedItems.map(item => {
-                const byteCharacters = atob(item.imageBase64);
-                const byteNumbers = new Array(byteCharacters.length);
-                for (let i = 0; i < byteCharacters.length; i++) {
-                    byteNumbers[i] = byteCharacters.charCodeAt(i);
-                }
-                const byteArray = new Uint8Array(byteNumbers);
-                const blob = new Blob([byteArray], { type: 'image/png' });
-                return new File([blob], `${item.name}.png`, { type: 'image/png' });
-            });
-            
-            formData = new FormData();
-            files.forEach(file => {
-                formData.append('files', file);
-            });
         }
 
         // Use authenticated fetch

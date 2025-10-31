@@ -90,7 +90,7 @@ class GeminiService:
             response = self.client.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=[
-                    "Analyze the provided room images, which show different angles of the same room. Identify every distinct piece of furniture, decor, and lighting. Consolidate items seen from multiple angles to avoid duplicates and use colours to differentiate between items. Provide a short, unique, descriptive name for each item. Return the result as a JSON array of strings. If the item is two of something just extract one of it",
+                    "Analyze the provided room images, which show different angles of the same room. Identify every distinct piece of furniture andlighting. Consolidate items seen from multiple angles to avoid duplicates and use colours to differentiate between items. Provide a short, unique, descriptive name for each item. Return the result as a JSON array of strings. If the item is two of something just extract one of it",
                     *image_parts
                 ],
                 config= types.GenerateContentConfig(
@@ -139,7 +139,7 @@ class GeminiService:
             prompt = (
                 f"From the provided images, find the best view of the '{item_name}' "
                 "and create a new image that contains only that item. The item should "
-                "be perfectly isolated with a transparent background and preferably be a front view of the item."
+                "be perfectly isolated with a transparent background and preferably be a front view of the item. Make sure the item is not cut off and is identical to the one present in the images."
             )
 
             response = self.client.models.generate_content(
@@ -149,7 +149,7 @@ class GeminiService:
                         *image_parts
                     ],
                     config= types.GenerateContentConfig(
-                        temperature= 0.5
+                        temperature= 0.4
                     )
                 )
             
