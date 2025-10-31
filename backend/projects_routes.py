@@ -320,8 +320,8 @@ async def search_similar(
             url_list = [urls]  # Single URL as string
     
     # Validate that at least one input is provided
-    if not files and not url_list:
-        raise HTTPException(status_code=400, detail="Either files or urls must be provided")
+    if not url_list:
+        raise HTTPException(status_code=400, detail="Urls must be provided")
     
     # Validate top_k
     if top_k < 1 or top_k > 100:
