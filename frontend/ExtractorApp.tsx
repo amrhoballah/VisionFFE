@@ -163,23 +163,23 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
       setLoadingMessage('Analyzing room and identifying items...');
       
       let itemNames: string[] = [];
+      const formData = new FormData();
+        
+      // Add files if we have them
+      if (hasFiles) {
+        uploadedFiles.forEach(file => {
+          formData.append('files', file);
+        });
+      }
       
+      // Add URLs if we have them
+      if (hasUrls) {
+        const urls = uploadedImagePreviews.filter(url => url.startsWith('http'));
+        formData.append('urls', JSON.stringify(urls));
+      }
       // Use backend identify endpoint if we have URLs or files
       if (hasUrls || hasFiles) {
-        const formData = new FormData();
         
-        // Add files if we have them
-        if (hasFiles) {
-          uploadedFiles.forEach(file => {
-            formData.append('files', file);
-          });
-        }
-        
-        // Add URLs if we have them
-        if (hasUrls) {
-          const urls = uploadedImagePreviews.filter(url => url.startsWith('http'));
-          formData.append('urls', JSON.stringify(urls));
-        }
         
         const response = await authService.authenticatedFetch(
           `${config.api.baseUrl}/projects/${projectId}/identify`,
