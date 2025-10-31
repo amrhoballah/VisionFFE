@@ -367,7 +367,7 @@ async def search_similar(
                     "results": formatted_results
                 })
         
-        total_queries = (len(files) if files else 0) + len(url_list)
+        total_queries = len(url_list)
         
         return {
             "success": True,
