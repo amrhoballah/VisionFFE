@@ -67,7 +67,7 @@ const ItemCard: React.FC<ItemCardProps> = ({ item, isSelected, onSelect }) => {
                       <img
                         src={result.metadata?.image_url}
                         alt={result.metadata?.title || result.filename}
-                        className="w-full h-32 object-cover rounded-md bg-base-200"
+                        className="w-full h-56 object-cover rounded-md bg-base-200"
                         onError={(e) => {
                           (e.target as HTMLImageElement).style.display = 'none';
                         }}
