@@ -72,7 +72,6 @@ class GeminiService:
             List of identified item names
         """
         try:
-            print("I am here 4")
             images_base64 = []
             for img_url in image_url:
                 response = requests.get(img_url)
@@ -83,13 +82,11 @@ class GeminiService:
                 images_base64.append({"base64": img_base64, "mimeType": mime_type})
             
             # Convert images to generative parts
-            print("I am here 5")
             image_parts = [
                 self._file_to_generative_part(img["base64"], img["mimeType"]) 
                 for img in images_base64
             ]
 
-            print("I am here 6")
             response = self.client.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=[
@@ -119,7 +116,7 @@ class GeminiService:
             raise ValueError("Failed to identify items from the images. Please try different ones.")
 
 
-    def extract_item_image(images: List[ImageInput], item_name: str) -> str:
+    async def extract_item_image(self, images: List[ImageInput], item_name: str) -> str:
         """
         Extracts a specific item from room images into a new, isolated image.
 
@@ -136,7 +133,7 @@ class GeminiService:
         try:
 
             # Convert image inputs.
-            image_parts = [_file_to_generative_part(img['base64'], img['mimeType']) for img in images]
+            image_parts = [self._file_to_generative_part(img['base64'], img['mimeType']) for img in images]
 
             # The prompt to guide the image generation.
             prompt = (
@@ -161,7 +158,7 @@ class GeminiService:
                 if part.inline_data and 'image' in part.inline_data.mime_type:
                     # Convert the raw image bytes back to a base64 string for transport.
                     image_bytes = part.inline_data.data
-                    base64_string = base64.b64encode(image_bytes).decode('utf-8')
+                    base64_string = b64.b64encode(image_bytes).decode('utf-8')
                     return base64_string
             
             # If no image was found in the response parts.

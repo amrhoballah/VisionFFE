@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from typing import List, Optional
 from bson import ObjectId
 from datetime import datetime
+import requests
+import base64 as b64
 import os
 import uuid
 import json
@@ -141,7 +143,6 @@ async def identify_project_items(
     
     # Collect all image URLs
     image_urls = []
-    print("I am here")
     # If files are provided, upload them first and add URLs
     if files:
         uploaded_urls: List[str] = []
@@ -159,7 +160,6 @@ async def identify_project_items(
     
     # Parse and add provided URLs
     if urls:
-        print("I am here 2")
         try:
             url_list = json.loads(urls) if isinstance(urls, str) else urls
             image_urls.extend(url_list)
@@ -173,7 +173,6 @@ async def identify_project_items(
     
     # Call Gemini service to identify items
     try:
-        print("I am here 3")
         items = await gemini_service.identify_items(image_urls)
         return {"items": items}
     except ValueError as e:
@@ -218,8 +217,9 @@ async def extract_project_items(
             img_base64 = b64.b64encode(response.content).decode('utf-8')
             mime_type = response.headers.get("Content-Type")
             images_base64.append({"base64": img_base64, "mimeType": mime_type})
-        print("I am here 3")
-        item = await gemini_service.extract_item_image(images_base64, item_name)
+        
+        item_base64 = await gemini_service.extract_item_image(images_base64, item_name)
+
         
         uploader = request.app.state.uploader
         if uploader is None:
@@ -227,30 +227,19 @@ async def extract_project_items(
         
         saved = []
         
-        name = (item_name).strip()[:128]
-        b64 = item
-        if not b64:
-            raise HTTPException(status_code=500, detail="Failed to extract item")
-        try:
-            data = bytes.fromhex("")  # dummy to keep syntax; will be replaced
-        except Exception:
-            data = None
-        try:
-            import base64 as _b64
-            data = _b64.b64decode(b64)
-        except Exception:
-            raise HTTPException(status_code=500, detail="Failed to extract item")
+        # Decode base64 string to bytes
+        item_bytes = b64.b64decode(item_base64)
         
-        url = await uploader.upload_bytes(data, f"projects/{project_id}/extracted")
-        if url:
-            saved.append({"name": name, "url": url})
+        uploaded_url = await uploader.upload_bytes(item_bytes, f"projects/{project_id}/extracted", filename="image.png")
+        if uploaded_url:
+            saved.append({"name": item_name, "url": uploaded_url})
 
         if saved:
             project.extracted_items.extend(saved)
             project.updated_at = datetime.utcnow()
             await project.save()
 
-        return item
+        return {"imageUrl": uploaded_url, "name": item_name} if uploaded_url else None
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -259,52 +248,52 @@ async def extract_project_items(
         raise HTTPException(status_code=500, detail="Failed to extract item")
 
 
-@router.post("/{project_id}/extracted-items", response_model=ProjectResponse)
-async def save_extracted_items(
-    request: Request,
-    project_id: str,
-    items: List[dict],
-    current_user: User = Depends(require_role_or_admin("designer"))
-):
-    """Save extracted items (name + base64 image) to storage and record under project."""
-    try:
-        project = await Project.find_one(Project.id == ObjectId(project_id), Project.user_id == current_user.id)
-    except:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid project id")
-    if not project:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+# @router.post("/{project_id}/extracted-items", response_model=ProjectResponse)
+# async def save_extracted_items(
+#     request: Request,
+#     project_id: str,
+#     items: List[dict],
+#     current_user: User = Depends(require_role_or_admin("designer"))
+# ):
+#     """Save extracted items (name + base64 image) to storage and record under project."""
+#     try:
+#         project = await Project.find_one(Project.id == ObjectId(project_id), Project.user_id == current_user.id)
+#     except:
+#         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid project id")
+#     if not project:
+#         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
 
-    uploader = request.app.state.uploader
-    if uploader is None:
-        raise HTTPException(status_code=500, detail="Uploader service not available")
+#     uploader = request.app.state.uploader
+#     if uploader is None:
+#         raise HTTPException(status_code=500, detail="Uploader service not available")
     
-    saved = []
-    for it in items:
-        name = (it.get("name") or "item").strip()[:128]
-        b64 = it.get("base64")
-        if not b64:
-            continue
-        try:
-            data = bytes.fromhex("")  # dummy to keep syntax; will be replaced
-        except Exception:
-            data = None
-        try:
-            import base64 as _b64
-            data = _b64.b64decode(b64)
-        except Exception:
-            continue
+#     saved = []
+#     for it in items:
+#         name = (it.get("name") or "item").strip()[:128]
+#         b64 = it.get("base64")
+#         if not b64:
+#             continue
+#         try:
+#             data = bytes.fromhex("")  # dummy to keep syntax; will be replaced
+#         except Exception:
+#             data = None
+#         try:
+#             import base64 as _b64
+#             data = _b64.b64decode(b64)
+#         except Exception:
+#             continue
         
-        url = await uploader.upload_bytes(data, f"projects/{project_id}/extracted")
-        if url:
-            saved.append({"name": name, "url": url})
+#         url = await uploader.upload_bytes(data, f"projects/{project_id}/extracted")
+#         if url:
+#             saved.append({"name": name, "url": url})
 
-    if saved:
-        project.extracted_items.extend(saved)
-        project.updated_at = datetime.utcnow()
-        await project.save()
+#     if saved:
+#         project.extracted_items.extend(saved)
+#         project.updated_at = datetime.utcnow()
+#         await project.save()
 
-    return project_to_dict(project)
+#     return project_to_dict(project)
 
 
 @router.post("/{project_id}/search")

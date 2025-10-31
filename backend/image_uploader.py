@@ -29,12 +29,25 @@ class ImageUploader:
     async def upload_bytes(self, data: bytes, folder_name: str, filename: str = "image.jpg"):
         """Upload raw bytes data to S3 storage"""
         try:
-            unique_name = f"{uuid.uuid4().hex}.jpg"
+            # Extract file extension from filename
+            # file_ext = os.path.splitext(filename)[1] or ".jpg"
+            unique_name = f"{uuid.uuid4().hex}"
+            
+            # Determine content type based on extension
+            content_type_map = {
+                ".jpg": "image/jpeg",
+                ".jpeg": "image/jpeg",
+                ".png": "image/png",
+                ".gif": "image/gif",
+                ".webp": "image/webp"
+            }
+            content_type = "image/png",
+            
             self.s3_client.put_object(
                 Bucket=self.bucket_name,
                 Key=f"{folder_name}/{unique_name}",
                 Body=data,
-                ContentType="image/jpeg"
+                ContentType=content_type
             )
             file_url = f"{os.getenv('R2_URL')}/{folder_name}/{unique_name}"
             return file_url

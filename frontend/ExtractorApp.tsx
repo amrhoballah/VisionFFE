@@ -259,32 +259,28 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
       //   images = await Promise.all(imagePromises);
       // }
 
-      const itemsToPersist: { name: string; base64: string }[] = [];
       for (let i = 0; i < itemNames.length; i++) {
         let newFormData = formData;
         const name = itemNames[i];
         newFormData.append('item_name', name);
         setLoadingMessage(`Extracting "${name}"... (${i + 1} of ${itemNames.length})`);
         try {
-          const itemImageBase64 = await authService.authenticatedFetch(
+          const imageResponse = await authService.authenticatedFetch(
             `${config.api.baseUrl}/projects/${projectId}/extract`,
             {
               method: 'POST',
               body: newFormData,
             }
           );
+          const imageResponseData = await imageResponse.json();
           setExtractedItems(prev => [
             ...prev,
-            { id: `${name.replace(/\s+/g, '-')}-${Date.now()}`, name, imageBase64: itemImageBase64 }
+            { id: `${name.replace(/\s+/g, '-')}-${Date.now()}`, name, url: imageResponseData.imageUrl }
           ]);
-          // Queue for backend persistence under project
-          itemsToPersist.push({ name, base64: itemImageBase64 });
         } catch (extractionError) {
             console.warn(`Could not extract "${name}". Skipping.`);
         }
       }
-
-
     } catch (err: any) {
         setError(err.message || 'An unexpected error occurred.');
     } finally {
