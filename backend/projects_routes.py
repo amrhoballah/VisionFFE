@@ -302,45 +302,43 @@ async def search_similar(
                     continue
                 
                 # For Embedder 3
-                # results = pinecone_index.query(
-                #     vector=query_embedding.tolist(),
-                #     top_k=top_k,
-                #     include_metadata=True
-                # )
+                results = pinecone_index.query(
+                    vector=query_embedding.tolist(),
+                    top_k=top_k,
+                    include_metadata=True
+                )
 
                 # For Embedder 2
-                results = pinecone_index.search(
-                    namespace="__default__", 
-                    query={
-                        "inputs": {"text": query_embedding}, 
-                        "top_k": top_k
-                    }
-                )
-                
-                print(results)
+                # results = pinecone_index.search(
+                #     namespace="__default__", 
+                #     query={
+                #         "inputs": {"text": query_embedding}, 
+                #         "top_k": top_k
+                #     }
+                # )
 
                 formatted_results = []
                 # For Embedder 3
-                # for match in results['matches']:
-                #     result = {
-                #         "id": match['id'],
-                #         "similarity_score": float(match['score']),
-                #         "metadata": match.get('metadata', {}),
-                #         "image_path": match['metadata'].get('image_path', ''),
-                #         "filename": match['metadata'].get('filename', '')
-                #     }
-                #     formatted_results.append(result)
-
-                # For Embedder 2
-                for match in results['result'].get('hits', []):
+                for match in results['matches']:
                     result = {
-                        "id": match['_id'],
-                        "similarity_score": float(match['_score']),
-                        "metadata": match.get('fields', {}),
-                        "image_path": match['fields'].get('image_path', ''),
-                        "filename": match['fields'].get('filename', '')
+                        "id": match['id'],
+                        "similarity_score": float(match['score']),
+                        "metadata": match.get('metadata', {}),
+                        "image_path": match['metadata'].get('image_path', ''),
+                        "filename": match['metadata'].get('filename', '')
                     }
                     formatted_results.append(result)
+
+                # For Embedder 2
+                # for match in results['result'].get('hits', []):
+                #     result = {
+                #         "id": match['_id'],
+                #         "similarity_score": float(match['_score']),
+                #         "metadata": match.get('fields', {}),
+                #         "image_path": match['fields'].get('image_path', ''),
+                #         "filename": match['fields'].get('filename', '')
+                #     }
+                #     formatted_results.append(result)
                 
                 all_results.append({
                     "query_identifier": url,
