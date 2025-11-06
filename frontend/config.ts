@@ -4,7 +4,7 @@ export const config = {
   // Backend API configuration
   api: {
     baseUrl: process.env.NODE_ENV === 'production' 
-      ? process.env.REACT_APP_API_URL || 'https://amrhoballah--vision-ffe-api-fast-app.modal.run'  // Replace with your Modal URL
+      ? process.env.REACT_APP_API_URL || 'https://visionffebackend-283672791521.europe-west1.run.app/'  // Replace with your Modal URL
       : 'http://localhost:8080',
   },
   
