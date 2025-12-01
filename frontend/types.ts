@@ -11,5 +11,6 @@ export interface ExtractedItem {
   name: string;
   imageBase64: string;
   imageUrl?: string; // URL from backend when loading existing items
+  subcategory?: string; // Optional furniture subcategory for constrained similarity search
   searchResults?: SearchResult[];
 }
