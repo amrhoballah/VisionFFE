@@ -30,13 +30,53 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
   const [isSending, setIsSending] = useState<boolean>(false);
   const [apiFeedback, setApiFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [deletingPhotoUrl, setDeletingPhotoUrl] = useState<string | null>(null);
-  const SUBCATEGORY_OPTIONS = [
-    'Sofas',
-    'Dining Chairs',
-    'Side Tables',
-    'Coffee Tables',
-    'Arm Chairs',
-  ];
+
+  // Auto-detect a furniture subcategory from an item name.
+  // Categories: Sofas, Dining Chairs, Side Tables, Coffee Tables, Arm Chairs
+  const autoDetectSubcategory = (name: string): string | undefined => {
+    const n = name.toLowerCase();
+
+    // Sofas
+    if (n.includes('sofa') || n.includes('couch') || n.includes('sectional')) {
+      return 'Sofas';
+    }
+
+    // Coffee tables
+    if (n.includes('coffee table')) {
+      return 'Coffee Tables';
+    }
+
+    // Side tables
+    if (
+      n.includes('side table') ||
+      n.includes('end table') ||
+      n.includes('bedside') ||
+      n.includes('nightstand') ||
+      n.includes('night stand')
+    ) {
+      return 'Side Tables';
+    }
+
+    // Dining chairs
+    if (
+      n.includes('dining chair') ||
+      (n.includes('chair') && n.includes('dining'))
+    ) {
+      return 'Dining Chairs';
+    }
+
+    // Arm chairs
+    if (
+      n.includes('armchair') ||
+      n.includes('arm chair') ||
+      n.includes('accent chair') ||
+      n.includes('lounge chair')
+    ) {
+      return 'Arm Chairs';
+    }
+
+    return undefined;
+  };
   
   const { logout, user } = useAuth();
   
@@ -84,7 +124,7 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
                   name: item.name,
                   imageBase64,
                   imageUrl: item.url,
-                  subcategory: item.subcategory,
+                  subcategory: item.subcategory || autoDetectSubcategory(item.name),
                 };
               })
             );
@@ -287,6 +327,7 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
               id: `${name.replace(/\s+/g, '-')}-${Date.now()}`,
               name,
               imageUrl: imageResponseData.imageUrl,
+              subcategory: autoDetectSubcategory(name),
             }
           ]);
         } catch (extractionError) {
@@ -346,17 +387,6 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
     setApiFeedback(null);
 
     const selectedItems = extractedItems.filter(item => selectedItemIds.has(item.id));
-
-    // Ensure all selected items have a subcategory chosen so we can constrain search
-    const itemsMissingCategory = selectedItems.filter(item => !item.subcategory);
-    if (itemsMissingCategory.length > 0) {
-      setApiFeedback({
-        type: 'error',
-        message: 'Please select a category for all selected items before searching.',
-      });
-      setIsSending(false);
-      return;
-    }
     
     // Use the project-specific search endpoint
     const FASTAPI_ENDPOINT = `${config.api.baseUrl}/projects/${projectId}/search`;
@@ -615,14 +645,6 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
                     item={item}
                     isSelected={selectedItemIds.has(item.id)}
                     onSelect={handleItemSelect}
-                    availableCategories={SUBCATEGORY_OPTIONS}
-                    onCategoryChange={(id, subcategory) => {
-                      setExtractedItems(prevItems =>
-                        prevItems.map(existing =>
-                          existing.id === id ? { ...existing, subcategory } : existing
-                        )
-                      );
-                    }}
                   />
                 ))}
               </div>

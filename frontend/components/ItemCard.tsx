@@ -6,20 +6,15 @@ interface ItemCardProps {
   item: ExtractedItem;
   isSelected: boolean;
   onSelect: (id: string) => void;
-  onCategoryChange?: (id: string, subcategory: string) => void;
-  availableCategories?: string[];
 }
 
 const ItemCard: React.FC<ItemCardProps> = ({
   item,
   isSelected,
   onSelect,
-  onCategoryChange,
-  availableCategories = [],
 }) => {
   const [showResults, setShowResults] = useState(false);
   const imageUrl = item.imageUrl || `data:image/png;base64,${item.imageBase64}`;
-  const hasCategories = availableCategories && availableCategories.length > 0;
 
   return (
     <div className="relative">
@@ -48,28 +43,10 @@ const ItemCard: React.FC<ItemCardProps> = ({
           <h3 className="text-sm font-medium text-white truncate capitalize">
             {item.name}
           </h3>
-          {hasCategories && onCategoryChange && (
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-white/80 whitespace-nowrap">
-                Category:
-              </label>
-              <select
-                className="text-xs bg-white/90 text-black rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand-primary"
-                value={item.subcategory || ''}
-                onChange={(e) => {
-                  e.stopPropagation();
-                  onCategoryChange(item.id, e.target.value);
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <option value="">Select</option>
-                {availableCategories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {item.subcategory && (
+            <p className="text-xs text-white/80">
+              {item.subcategory}
+            </p>
           )}
         </div>
       </div>
