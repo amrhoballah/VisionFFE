@@ -8,11 +8,7 @@ interface ItemCardProps {
   onSelect: (id: string) => void;
 }
 
-const ItemCard: React.FC<ItemCardProps> = ({
-  item,
-  isSelected,
-  onSelect,
-}) => {
+const ItemCard: React.FC<ItemCardProps> = ({ item, isSelected, onSelect }) => {
   const [showResults, setShowResults] = useState(false);
   const imageUrl = item.imageUrl || `data:image/png;base64,${item.imageBase64}`;
 
@@ -39,15 +35,8 @@ const ItemCard: React.FC<ItemCardProps> = ({
             className="w-full h-full object-contain"
           />
         </div>
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 space-y-1">
-          <h3 className="text-sm font-medium text-white truncate capitalize">
-            {item.name}
-          </h3>
-          {item.subcategory && (
-            <p className="text-xs text-white/80">
-              {item.subcategory}
-            </p>
-          )}
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+          <h3 className="text-sm font-medium text-white truncate capitalize">{item.name}</h3>
         </div>
       </div>
       

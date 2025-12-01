@@ -30,53 +30,6 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
   const [isSending, setIsSending] = useState<boolean>(false);
   const [apiFeedback, setApiFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [deletingPhotoUrl, setDeletingPhotoUrl] = useState<string | null>(null);
-
-  // Auto-detect a furniture subcategory from an item name.
-  // Categories: Sofas, Dining Chairs, Side Tables, Coffee Tables, Arm Chairs
-  const autoDetectSubcategory = (name: string): string | undefined => {
-    const n = name.toLowerCase();
-
-    // Sofas
-    if (n.includes('sofa') || n.includes('couch') || n.includes('sectional')) {
-      return 'Sofas';
-    }
-
-    // Coffee tables
-    if (n.includes('coffee table')) {
-      return 'Coffee Tables';
-    }
-
-    // Side tables
-    if (
-      n.includes('side table') ||
-      n.includes('end table') ||
-      n.includes('bedside') ||
-      n.includes('nightstand') ||
-      n.includes('night stand')
-    ) {
-      return 'Side Tables';
-    }
-
-    // Dining chairs
-    if (
-      n.includes('dining chair') ||
-      (n.includes('chair') && n.includes('dining'))
-    ) {
-      return 'Dining Chairs';
-    }
-
-    // Arm chairs
-    if (
-      n.includes('armchair') ||
-      n.includes('arm chair') ||
-      n.includes('accent chair') ||
-      n.includes('lounge chair')
-    ) {
-      return 'Arm Chairs';
-    }
-
-    return undefined;
-  };
   
   const { logout, user } = useAuth();
   
@@ -123,8 +76,7 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
                   id: `${item.name.replace(/\s+/g, '-')}-${Date.now()}-${index}`,
                   name: item.name,
                   imageBase64,
-                  imageUrl: item.url,
-                  subcategory: item.subcategory || autoDetectSubcategory(item.name),
+                  imageUrl: item.url
                 };
               })
             );
@@ -323,12 +275,7 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
           const imageResponseData = await imageResponse.json();
           setExtractedItems(prev => [
             ...prev,
-            {
-              id: `${name.replace(/\s+/g, '-')}-${Date.now()}`,
-              name,
-              imageUrl: imageResponseData.imageUrl,
-              subcategory: autoDetectSubcategory(name),
-            }
+            { id: `${name.replace(/\s+/g, '-')}-${Date.now()}`, name, imageUrl: imageResponseData.imageUrl }
           ]);
         } catch (extractionError) {
             console.warn(`Could not extract "${name}". Skipping.`);
@@ -398,12 +345,10 @@ const ExtractorApp: React.FC<ExtractorAppProps> = ({ projectId, projectName, onC
         let formData: FormData;
         
         if (hasUrls) {
-            // Use URL-based search with aligned subcategories
+            // Use URL-based search
             const urls = selectedItems.map(item => item.imageUrl!).filter(Boolean);
-            const categories = selectedItems.map(item => item.subcategory || null);
             formData = new FormData();
             formData.append('urls', JSON.stringify(urls));
-            formData.append('categories', JSON.stringify(categories));
         }
 
         // Use authenticated fetch

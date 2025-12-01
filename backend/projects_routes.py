@@ -251,9 +251,9 @@ async def search_similar(
     request: Request, 
     project_id: str,
     urls: Optional[str] = Form(None),
-    categories: Optional[str] = Form(None),
     top_k: int = Form(5),
-    current_user = Depends(require_search_permission)
+    current_user = Depends(require_search_permission),
+    gemini_service = Depends(get_gemini_service),
 ):
     try:
         project = await Project.find_one(Project.id == ObjectId(project_id), Project.user_id == current_user.id)
@@ -278,16 +278,6 @@ async def search_similar(
         except json.JSONDecodeError:
             url_list = [urls]  # Single URL as string
     
-    # Parse categories (subcategories) if provided.
-    # This is expected to be a JSON array aligned by index with url_list.
-    categories_list: Optional[list] = None
-    if categories:
-        try:
-            categories_list = json.loads(categories) if isinstance(categories, str) else categories
-        except json.JSONDecodeError:
-            # If parsing fails, we simply ignore categories and run unfiltered search.
-            categories_list = None
-    
     # Validate that at least one input is provided
     if not url_list:
         raise HTTPException(status_code=400, detail="Urls must be provided")
@@ -302,6 +292,18 @@ async def search_similar(
         # Process URLs if provided
         if url_list:
             for url in url_list:
+                # First, categorize the query image so we can restrict results
+                try:
+                    category = await gemini_service.categorize_item_from_url(url)
+                except ValueError as e:
+                    all_results.append({
+                        "query_identifier": url,
+                        "success": False,
+                        "error": str(e),
+                        "results": []
+                    })
+                    continue
+
                 query_embedding = embedder.get_embedding(url)
                 if query_embedding is None:
                     all_results.append({
@@ -312,28 +314,13 @@ async def search_similar(
                     })
                     continue
                 
-                # Determine subcategory filter for this query, if provided
-                subcategory_filter = None
-                if categories_list is not None:
-                    try:
-                        index_for_url = url_list.index(url)
-                        if 0 <= index_for_url < len(categories_list):
-                            subcategory_filter = categories_list[index_for_url]
-                    except ValueError:
-                        subcategory_filter = None
-
-                # Build Pinecone query kwargs, optionally constrained by subcategory
-                query_kwargs = {
-                    "vector": query_embedding.tolist(),
-                    "top_k": top_k,
-                    "include_metadata": True
-                }
-                if subcategory_filter:
-                    # We store the normalized subcategory under the "subcategory" key in metadata.
-                    query_kwargs["filter"] = {"subcategory": subcategory_filter}
-
                 # For Embedder 3
-                results = pinecone_index.query(**query_kwargs)
+                results = pinecone_index.query(
+                    vector=query_embedding.tolist(),
+                    top_k=top_k,
+                    include_metadata=True,
+                    filter={"category": category},
+                )
 
                 # For Embedder 2
                 # results = pinecone_index.search(
