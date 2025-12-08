@@ -252,7 +252,8 @@ async def search_similar(
     project_id: str,
     urls: Optional[str] = Form(None),
     top_k: int = Form(5),
-    current_user = Depends(require_search_permission)
+    current_user = Depends(require_search_permission),
+    gemini_service = Depends(get_gemini_service)
 ):
     try:
         project = await Project.find_one(Project.id == ObjectId(project_id), Project.user_id == current_user.id)
@@ -291,6 +292,7 @@ async def search_similar(
         # Process URLs if provided
         if url_list:
             for url in url_list:
+                category = await gemini_service.categorize_item_from_url(url)
                 query_embedding = embedder.get_embedding(url)
                 if query_embedding is None:
                     all_results.append({
@@ -305,6 +307,9 @@ async def search_similar(
                 results = pinecone_index.query(
                     vector=query_embedding.tolist(),
                     top_k=top_k,
+                    filter={
+                        "sub_category": {"$eq": category}
+                    },
                     include_metadata=True
                 )
 
@@ -327,7 +332,8 @@ async def search_similar(
                         "image_path": match['metadata'].get('image_path', ''),
                         "filename": match['metadata'].get('filename', '')
                     }
-                    formatted_results.append(result)
+                    if result['similarity_score'] >= 0.6:
+                        formatted_results.append(result)
 
                 # For Embedder 2
                 # for match in results['result'].get('hits', []):
