@@ -24,6 +24,8 @@ class IdentifyItemsRequest(BaseModel):
 class IdentifyItemsResponse(BaseModel):
     items: List[str]
 
+class ItemCategoryResponse(BaseModel):
+    category: str
 class ExtractItemRequest(BaseModel):
     images: List[ImageInputRequest]
     item_name: str
