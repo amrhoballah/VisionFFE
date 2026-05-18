@@ -48,6 +48,8 @@ async def lifespan(app: FastAPI):
         model_preset = os.getenv("MODEL_PRESET", "balanced")
         app.state.embedder = ImageEmbedder3(preset=model_preset, device=device)
         print(f"✅ Embedder loaded with preset: {model_preset}")
+        if hasattr(app.state.embedder, "model_key"):
+            print(f"   Resolved OpenCLIP profile: {app.state.embedder.model_key}")
     except Exception as e:
         print(f"⚠️ Warning: Could not load embedder: {e}")
         print("   App will work but image search/upload may fail")

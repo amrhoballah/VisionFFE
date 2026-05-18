@@ -106,13 +106,41 @@ GET /api/database/stats
 DELETE /api/database/clear
 ```
 
-## Model Presets
+## Model presets (`MODEL_PRESET`)
 
-- **best**: Highest accuracy, slower (ConvNeXt V2 Huge)
-- **balanced**: Great accuracy, reasonable speed (ConvNeXt V2 Base) ⭐ Recommended
-- **fast**: Fast processing (EfficientNet B3)
-- **fastest**: Fastest, lower accuracy (MobileNet V3)
-- **semantic**: Best for concept understanding (CLIP ViT)
+`ImageEmbedder3` uses **OpenCLIP** only. Each preset resolves to a `MODEL::PRETRAINED` pair:
+
+| Preset | OpenCLIP profile |
+|--------|------------------|
+| **fastest** / **fast** | ViT-B-32::laion2b_e16 |
+| **balanced** (default) | ViT-L-14::laion2b_s32b_b82k |
+| **best** / **nextbest** | ViT-H-14::laion2B-s32B-b79K |
+| **newbest** | ViT-bigG-14::laion2B-s39B-b160K |
+| **semantic** | ViT-B-16::openai |
+| **siglip** | ViT-SO400M-14-SigLIP-384::webli |
+| **newest** | Same as **best** (LAION ViT-H; DINOv2 not wired here) |
+
+You can also set `MODEL_PRESET` to a raw OpenCLIP id, e.g. `ViT-H-14::laion2B-s32B-b79K`.
+
+## Retrieval tuning (optional env)
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `SIMILARITY_THRESHOLD` | `0.35` | Minimum cosine similarity to keep a hit; `-1` disables filtering |
+| `RETRIEVAL_CANDIDATES_K` | `50` | Internal Pinecone `top_k` before re-rank / threshold / client `top_k` trim |
+| `RETRIEVAL_MIN_RESULTS_FALLBACK` | `2` | If fewer hits, widen filter then drop filter |
+| `RETRIEVAL_METADATA_BOOST` | `0.04` | Score boost when title/description matches family keywords |
+| `EMBEDDER_MULTI_CROP` | unset | Set to `1` / `true` to average default + center-crop embeddings |
+| `PINECONE_NAMESPACE` | `__default__` | Pinecone namespace for query/upsert |
+
+## Offline retrieval eval
+
+```bash
+cd backend
+python scripts/eval_retrieval.py --manifest ../data/eval_manifest.example.json --k 1,5,10
+```
+
+Populate `queries` with `image_url`, `relevant_ids` (Pinecone vector ids), and `search_family` for filtered-vs-unfiltered metrics. Use `--preset siglip` or `--multi-crop` to compare embedding setups.
 
 ## Example Usage
 

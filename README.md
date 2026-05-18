@@ -35,8 +35,8 @@ VisionFFE is an AI-powered furniture extraction and search system built with a *
 
 2. **Project Creation & Image Upload**
    - In `ProjectsPage` / `ExtractorApp`, the user creates or selects a project.
-   - User uploads room renders; frontend sends them to `/api/upload`.
-   - Backend stores images in **Cloudflare R2**, embeds them with `ImageEmbedder3`, and upserts vectors into **Pinecone**.
+   - Room renders are uploaded to **`/projects/{id}/photos`** and stored in **Cloudflare R2**.
+   - **Catalog** furniture images for similarity search are ingested via **`POST /api/upload`** (admin); each image is embedded with **`ImageEmbedder3`** and upserted into **Pinecone** with metadata including **`search_family`** (mapped from `sub_category`).
 
 3. **Furniture/Decor Identification (Gemini)**
    - Frontend calls `backendGeminiService.identifyItems(images)` which hits the FastAPI Gemini route.
@@ -49,8 +49,8 @@ VisionFFE is an AI-powered furniture extraction and search system built with a *
    - Frontend shows the cut-out and can store it in the project’s `extracted_items`.
 
 5. **Categorization & Search**
-   - For single-item images, backend can call `categorize_item_from_url` to assign a category from the fixed list.
-   - Combined with Pinecone embeddings, this enables category-aware similarity search across stored items.
+   - For single-item images, the backend calls `categorize_item_from_url` to assign a category from the fixed list.
+   - **`POST /projects/{id}/search`** embeds the query image, queries **Pinecone** with a **`search_family`** filter (aligned with catalog ingest via [`backend/taxonomy.py`](backend/taxonomy.py)), optional retrieval fallback and metadata re-ranking ([`backend/retrieval.py`](backend/retrieval.py)).
 
 6. **Admin & Stats**
    - Admin routes manage users, roles, and permissions.

@@ -1,0 +1,4 @@
+{
+  "_comment": "Copy to eval_manifest.json. Each query needs image_url, relevant_ids (Pinecone vector ids), and search_family for filtered eval.",
+  "queries": []
+}

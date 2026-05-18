@@ -5,7 +5,7 @@ Run this once to update existing users in the database.
 
 import asyncio
 from beanie import init_beanie
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 from models import User
 import os
 from dotenv import load_dotenv
@@ -20,10 +20,9 @@ async def migrate_users():
     if not mongodb_url:
         raise ValueError("MONGODB_URL environment variable is not set")
     
-    client = AsyncIOMotorClient(mongodb_url)
+    client = AsyncMongoClient(mongodb_url)
     database = client[os.getenv("MONGODB_DB_NAME", "visionffe")]
-    
-    # Initialize Beanie
+
     await init_beanie(database=database, document_models=[User])
     
     print("🔍 Finding users that need migration...")

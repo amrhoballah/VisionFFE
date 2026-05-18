@@ -11,6 +11,13 @@ from models import Project, User
 from schemas import ProjectCreate, ProjectResponse
 from auth_dependencies import require_role_or_admin, require_search_permission
 from gemini_service import get_gemini_service
+from retrieval import (
+    apply_similarity_threshold,
+    query_pinecone_with_fallback,
+    rerank_matches_by_category_keywords,
+    similarity_threshold,
+    trim_to_top_k,
+)
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -252,6 +259,7 @@ async def search_similar(
     project_id: str,
     urls: Optional[str] = Form(None),
     top_k: int = Form(5),
+    search_debug: Optional[str] = Form(None),
     current_user = Depends(require_search_permission),
     gemini_service = Depends(get_gemini_service)
 ):
@@ -285,6 +293,10 @@ async def search_similar(
     # Validate top_k
     if top_k < 1 or top_k > 100:
         raise HTTPException(status_code=400, detail="top_k must be between 1 and 100")
+
+    include_debug = bool(
+        search_debug and str(search_debug).lower() in ("1", "true", "yes")
+    )
     
     try:
         all_results = []
@@ -302,55 +314,42 @@ async def search_similar(
                         "results": []
                     })
                     continue
-                
-                # For Embedder 3
-                results = pinecone_index.query(
-                    vector=query_embedding.tolist(),
-                    top_k=top_k,
-                    filter={
-                        "sub_category": {"$eq": category}
-                    },
-                    include_metadata=True
-                )
 
-                # For Embedder 2
-                # results = pinecone_index.search(
-                #     namespace="__default__", 
-                #     query={
-                #         "inputs": {"text": query_embedding}, 
-                #         "top_k": top_k
-                #     }
-                # )
+                matches, retrieval_debug = query_pinecone_with_fallback(
+                    pinecone_index,
+                    query_embedding.tolist(),
+                    category,
+                    top_k,
+                )
+                matches = rerank_matches_by_category_keywords(matches, category)
+                thr = similarity_threshold()
+                matches = apply_similarity_threshold(matches, thr)
+                matches = trim_to_top_k(matches, top_k)
 
                 formatted_results = []
-                # For Embedder 3
-                for match in results['matches']:
-                    result = {
-                        "id": match['id'],
-                        "similarity_score": float(match['score']),
-                        "metadata": match.get('metadata', {}),
-                        "image_path": match['metadata'].get('image_path', ''),
-                        "filename": match['metadata'].get('filename', '')
-                    }
-                    if result['similarity_score'] >= 0.6:
-                        formatted_results.append(result)
+                for match in matches:
+                    meta = match.get("metadata") or {}
+                    formatted_results.append({
+                        "id": match["id"],
+                        "similarity_score": float(match.get("score", 0.0)),
+                        "metadata": meta,
+                        "image_path": meta.get("image_path", ""),
+                        "filename": meta.get("filename", ""),
+                    })
 
-                # For Embedder 2
-                # for match in results['result'].get('hits', []):
-                #     result = {
-                #         "id": match['_id'],
-                #         "similarity_score": float(match['_score']),
-                #         "metadata": match.get('fields', {}),
-                #         "image_path": match['fields'].get('image_path', ''),
-                #         "filename": match['fields'].get('filename', '')
-                #     }
-                #     formatted_results.append(result)
-                
-                all_results.append({
+                row = {
                     "query_identifier": url,
                     "success": True,
-                    "results": formatted_results
-                })
+                    "results": formatted_results,
+                }
+                if include_debug:
+                    row["search_debug"] = {
+                        "gemini_family": category,
+                        "similarity_threshold": thr,
+                        "retrieval": retrieval_debug,
+                        "embed_model": getattr(embedder, "model_key", None),
+                    }
+                all_results.append(row)
         
         total_queries = len(url_list)
         

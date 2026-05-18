@@ -1,13 +1,11 @@
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 from beanie import init_beanie
 from auth_config import auth_settings
 from models import User, Role, Permission, Token, Project
-import asyncio
-import ssl
 import certifi
 
-# Global MongoDB client
-client: AsyncIOMotorClient = None
+# Global MongoDB client (PyMongo async — required by Beanie 2.x)
+client: AsyncMongoClient | None = None
 
 
 async def init_database():
@@ -43,22 +41,14 @@ async def init_database():
                 "tls": False
             })
 
-        # Create MongoDB client
-        client = AsyncIOMotorClient(
-            auth_settings.mongodb_url,
-            tls=True,
-            tlsCAFile=certifi.where(),
-            tlsAllowInvalidCertificates=False
-        )
+        client = AsyncMongoClient(auth_settings.mongodb_url, **connection_kwargs)
 
-        # Test connection
         await client.admin.command("ping")
         print("✅ MongoDB connection successful")
 
-        # Initialize Beanie with the database
         await init_beanie(
             database=client[auth_settings.mongodb_database],
-            document_models=[User, Role, Permission, Token, Project]
+            document_models=[User, Role, Permission, Token, Project],
         )
 
         print("✅ MongoDB database initialized")
@@ -66,7 +56,7 @@ async def init_database():
     except Exception as e:
         print(f"❌ Error initializing MongoDB: {e}")
         if client:
-            client.close()
+            await client.close()
         raise
 
 
@@ -74,7 +64,8 @@ async def close_database():
     """Close MongoDB connection."""
     global client
     if client:
-        client.close()
+        await client.close()
+        client = None
         print("✅ MongoDB connection closed")
 
 
