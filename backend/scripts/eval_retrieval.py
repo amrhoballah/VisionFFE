@@ -48,16 +48,26 @@ def run_eval(
     preset: Optional[str],
     no_filter: bool,
     multi_crop: bool,
+    backend: str,
 ) -> Dict[str, Any]:
-    import torch
     from pinecone import Pinecone
 
-    from image_embedder3 import ImageEmbedder3
+    from embedder_factory import create_embedder
     from retrieval import pinecone_filter_search_family
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_preset = preset or os.getenv("MODEL_PRESET", "balanced")
-    embedder = ImageEmbedder3(preset=model_preset, device=device)
+    device = None
+    if backend == "openclip":
+        import torch
+
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        os.environ["EMBEDDER_BACKEND"] = "openclip"
+        if preset:
+            os.environ["MODEL_PRESET"] = preset
+    else:
+        os.environ["EMBEDDER_BACKEND"] = "gemini"
+
+    embedder = create_embedder(device=device)
+    model_preset = getattr(embedder, "model_key", preset or os.getenv("MODEL_PRESET", "balanced"))
 
     pc = Pinecone(api_key=os.environ["PINECONE_API_KEY"])
     index_name = os.getenv("PINECONE_INDEX_NAME", "default")
@@ -122,6 +132,7 @@ def run_eval(
     return {
         "num_manifest_queries": len(queries),
         "num_evaluated": evaluated,
+        "backend": backend,
         "model_preset": model_preset,
         "multi_crop": multi_crop,
         "no_filter_mode": no_filter,
@@ -136,6 +147,8 @@ def main() -> None:
     p = argparse.ArgumentParser(description="VisionFFE retrieval eval")
     p.add_argument("--manifest", required=True, help="Path to eval manifest JSON")
     p.add_argument("--k", default="1,5,10", help="Comma-separated K values for Recall@K")
+    p.add_argument("--backend", default=os.getenv("EMBEDDER_BACKEND", "gemini"),
+                   choices=["gemini", "openclip"], help="Embedding backend to evaluate")
     p.add_argument("--preset", default=None, help="Override MODEL_PRESET for OpenCLIP")
     p.add_argument("--no-filter", action="store_true", help="Do not apply search_family metadata filter (filtered metrics mirror unfiltered)")
     p.add_argument("--multi-crop", action="store_true", help="Use embedder multi-crop averaging")
@@ -152,6 +165,7 @@ def main() -> None:
         preset=args.preset,
         no_filter=args.no_filter,
         multi_crop=args.multi_crop,
+        backend=args.backend,
     )
     print(json.dumps(report, indent=2))
 

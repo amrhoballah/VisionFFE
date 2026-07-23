@@ -7,9 +7,7 @@ import os
 import json
 from pinecone import Pinecone
 from dotenv import load_dotenv
-from image_embedder import ImageEmbedder
-from image_embedder2 import ImageEmbedder2
-from image_embedder3 import ImageEmbedder3
+from embedder_factory import create_embedder
 from image_uploader import ImageUploader
 import boto3
 
@@ -18,6 +16,7 @@ from database import init_database, init_default_data, close_database
 from auth_routes import router as auth_router
 from admin_routes import router as admin_router
 from projects_routes import router as projects_router
+from embeddings_routes import router as embeddings_router
 # from gemini_routes import router as gemini_router
 from auth_dependencies import require_search_permission, require_upload_permission, require_stats_permission
 
@@ -43,13 +42,17 @@ async def lifespan(app: FastAPI):
         return
 
     # --- Initialize Embedder ---
+    # Backend selected via EMBEDDER_BACKEND (default "gemini" = Gemini Embedding 2, no GPU).
+    # NOTE: switching backends changes the vector space AND dimension, so PINECONE_INDEX_NAME
+    # must point at an index that matches the active backend (re-embed the catalog per backend).
     print("🔧 Initializing embedder model...")
+    app.state.embedder = None
     try:
-        model_preset = os.getenv("MODEL_PRESET", "balanced")
-        app.state.embedder = ImageEmbedder3(preset=model_preset, device=device)
-        print(f"✅ Embedder loaded with preset: {model_preset}")
+        app.state.embedder = create_embedder(device=device)
+        backend = os.getenv("EMBEDDER_BACKEND", "gemini")
+        print(f"✅ Embedder loaded (backend: {backend})")
         if hasattr(app.state.embedder, "model_key"):
-            print(f"   Resolved OpenCLIP profile: {app.state.embedder.model_key}")
+            print(f"   Resolved embedding profile: {app.state.embedder.model_key}")
     except Exception as e:
         print(f"⚠️ Warning: Could not load embedder: {e}")
         print("   App will work but image search/upload may fail")
@@ -137,6 +140,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(projects_router)
+app.include_router(embeddings_router)
 # app.include_router(gemini_router)
 
 @app.get("/")

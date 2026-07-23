@@ -305,7 +305,10 @@ async def search_similar(
         if url_list:
             for url in url_list:
                 category = await gemini_service.categorize_item_from_url(url)
-                query_embedding = embedder.get_embedding(url)
+                # Use RETRIEVAL_QUERY task type for the search input; catalog items are
+                # embedded as RETRIEVAL_DOCUMENT at ingest time. The OpenCLIP embedder
+                # ignores the extra kwarg.
+                query_embedding = embedder.get_embedding(url, task_type="RETRIEVAL_QUERY")
                 if query_embedding is None:
                     all_results.append({
                         "query_identifier": url,
