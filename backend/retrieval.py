@@ -1,5 +1,6 @@
 """
-Two-stage retrieval helpers: Pinecone query, score thresholding, family fallback, metadata re-ranking.
+Two-stage retrieval helpers: MongoDB Atlas Vector Search query, score thresholding,
+family fallback, metadata re-ranking.
 """
 
 from __future__ import annotations
@@ -47,7 +48,7 @@ def _env_int(name: str, default: int) -> int:
 
 def similarity_threshold() -> Optional[float]:
     """
-    Minimum Pinecone similarity score to keep a hit. None = no cutoff.
+    Minimum vector similarity score to keep a hit. None = no cutoff.
     Set SIMILARITY_THRESHOLD=-1 to disable.
     """
     raw = os.getenv("SIMILARITY_THRESHOLD", "0.35")
@@ -72,7 +73,7 @@ def min_results_before_fallback() -> int:
     return _env_int("RETRIEVAL_MIN_RESULTS_FALLBACK", 2)
 
 
-def pinecone_filter_search_family(
+def vector_filter_search_family(
     family: str, mode: str = "exact"
 ) -> Optional[Dict[str, Any]]:
     if mode == "exact":
@@ -83,15 +84,15 @@ def pinecone_filter_search_family(
     return None
 
 
-def query_pinecone_with_fallback(
-    pinecone_index,
+def query_vector_index_with_fallback(
+    vector_index,
     vector: List[float],
     search_family: str,
     top_k: int,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """
-    Query Pinecone: exact family -> related families -> no metadata filter.
-    Returns (matches list compatible with Pinecone 'matches' shape, debug dict).
+    Query the vector index: exact family -> related families -> no metadata filter.
+    Returns (matches list compatible with the MongoVectorIndex 'matches' shape, debug dict).
     """
     debug: Dict[str, Any] = {"stages": []}
     internal_k = internal_candidate_k(top_k)
@@ -104,17 +105,17 @@ def query_pinecone_with_fallback(
         }
         if filter_dict is not None:
             kwargs["filter"] = filter_dict
-        kwargs["namespace"] = os.getenv("PINECONE_NAMESPACE", "__default__")
-        resp = pinecone_index.query(**kwargs)
+        kwargs["namespace"] = os.getenv("VECTOR_NAMESPACE", "__default__")
+        resp = vector_index.query(**kwargs)
         matches = list(resp.get("matches") or [])
         debug["stages"].append({"stage": label, "filter": filter_dict, "count": len(matches)})
         return matches
 
-    f_exact = pinecone_filter_search_family(search_family, "exact")
+    f_exact = vector_filter_search_family(search_family, "exact")
     matches = run_query(f_exact, "exact_family")
 
     if len(matches) < min_results_before_fallback():
-        f_rel = pinecone_filter_search_family(search_family, "related")
+        f_rel = vector_filter_search_family(search_family, "related")
         matches = run_query(f_rel, "related_families")
 
     if len(matches) < min_results_before_fallback():

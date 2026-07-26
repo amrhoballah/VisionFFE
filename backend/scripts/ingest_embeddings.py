@@ -1,23 +1,24 @@
 #!/usr/bin/env python3
 """
-Bulk ingest images -> embeddings -> Pinecone, for testing an embedding backend.
+Bulk ingest images -> embeddings -> MongoDB Atlas Vector Search, for testing an embedding backend.
 
 Feeds images from the real catalog CSV (default), a local folder, or a URL list,
 embeds each with the selected backend (Gemini Embedding 2 by default), enriches
-metadata with the shared taxonomy, and upserts into a Pinecone index (created if
-missing). Pair with scripts/eval_retrieval.py to compare backends.
+metadata with the shared taxonomy, and upserts into a MongoDB collection (creating
+its Atlas Vector Search index if missing). Pair with scripts/eval_retrieval.py to
+compare backends.
 
 Usage (from repo root):
   cd backend
   python scripts/ingest_embeddings.py --backend gemini --source csv \
-      --path ../data/efreshli-products.csv --limit 50 --index visionffe-gemini-test
+      --path ../data/efreshli-products.csv --limit 50 --collection visionffe_gemini_test
 
   python scripts/ingest_embeddings.py --backend gemini --source folder --path ./imgs
   python scripts/ingest_embeddings.py --backend gemini --source urls --path urls.txt
 
-Requires .env with GEMINI_API_KEY (gemini) or MODEL_PRESET (openclip), plus
-PINECONE_API_KEY. GEMINI_EMBED_DIM controls both the Gemini output dim and the
-index dimension for a newly created index.
+Requires .env with GEMINI_API_KEY (gemini) or MODEL_PRESET (openclip), plus MONGODB_URL
+pointed at an Atlas cluster (Vector Search indexes are an Atlas-only feature). GEMINI_EMBED_DIM
+controls both the Gemini output dim and the vector index dimension for a newly created index.
 """
 
 from __future__ import annotations
@@ -28,9 +29,8 @@ import json
 import mimetypes
 import os
 import sys
-import time
 import uuid
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Optional
 
 # Allow running as a script from backend/
 _BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -43,7 +43,8 @@ load_dotenv(os.path.join(_BACKEND_DIR, ".env"))
 load_dotenv()
 
 from embedder_factory import create_embedder  # noqa: E402
-from taxonomy import enrich_pinecone_metadata  # noqa: E402
+from taxonomy import enrich_vector_metadata  # noqa: E402
+from mongo_vector_store import MongoVectorIndex, ensure_vector_index, get_vector_collection  # noqa: E402
 
 
 def _default_dim() -> int:
@@ -109,29 +110,6 @@ def iter_folder(path: str) -> Iterator[Dict[str, Any]]:
         }
 
 
-def ensure_index(pc, index_name: str, dim: int):
-    """Return the index handle, creating a serverless cosine index if missing."""
-    existing = pc.list_indexes().names()
-    if index_name not in existing:
-        from pinecone import ServerlessSpec
-
-        cloud = os.getenv("PINECONE_CLOUD", "aws")
-        region = os.getenv("PINECONE_REGION", "us-east-1")
-        print(f"Creating Pinecone index '{index_name}' (dim={dim}, metric=cosine, {cloud}/{region})...")
-        pc.create_index(
-            name=index_name,
-            dimension=dim,
-            metric="cosine",
-            spec=ServerlessSpec(cloud=cloud, region=region),
-        )
-        # Wait for readiness
-        for _ in range(30):
-            if index_name in pc.list_indexes().names():
-                break
-            time.sleep(2)
-    return pc.Index(index_name)
-
-
 def _embed_row(embedder, row: Dict[str, Any]):
     """Embed either a URL row or an in-memory bytes row."""
     if "bytes" in row:
@@ -144,10 +122,8 @@ def _embed_row(embedder, row: Dict[str, Any]):
 
 
 def run(args: argparse.Namespace) -> int:
-    from pinecone import Pinecone
-
-    if "PINECONE_API_KEY" not in os.environ:
-        print("ERROR: PINECONE_API_KEY not set", file=sys.stderr)
+    if not os.getenv("MONGODB_URL"):
+        print("ERROR: MONGODB_URL not set", file=sys.stderr)
         return 1
 
     os.environ["EMBEDDER_BACKEND"] = args.backend
@@ -157,10 +133,13 @@ def run(args: argparse.Namespace) -> int:
     embedder = create_embedder()
     dim = args.dim or getattr(embedder, "embed_dim", None) or _default_dim()
 
-    pc = Pinecone(api_key=os.environ["PINECONE_API_KEY"])
-    index_name = args.index or os.getenv("PINECONE_INDEX_NAME", "visionffe-gemini-test")
-    index = ensure_index(pc, index_name, dim)
-    namespace = args.namespace or os.getenv("PINECONE_NAMESPACE", "__default__")
+    collection_name = args.collection or os.getenv("MONGODB_VECTOR_COLLECTION", "visionffe_gemini_test")
+    search_index_name = args.index_name or os.getenv("VECTOR_SEARCH_INDEX_NAME", "vector_index")
+    namespace = args.namespace or os.getenv("VECTOR_NAMESPACE", "__default__")
+
+    collection = get_vector_collection(collection_name)
+    ensure_vector_index(collection, search_index_name, dim, filter_fields=["search_family"])
+    index = MongoVectorIndex(collection, search_index_name, dim)
 
     if args.source == "csv":
         rows = iter_csv(args.path or os.path.join(_BACKEND_DIR, "..", "data", "efreshli-products.csv"))
@@ -192,7 +171,7 @@ def run(args: argparse.Namespace) -> int:
             continue
 
         vector_id = row.get("id") or uuid.uuid4().hex
-        meta = enrich_pinecone_metadata(row.get("metadata") or {})
+        meta = enrich_vector_metadata(row.get("metadata") or {})
         batch.append({"id": str(vector_id), "values": vec.tolist(), "metadata": meta})
         ok += 1
 
@@ -206,12 +185,13 @@ def run(args: argparse.Namespace) -> int:
     print(json.dumps({
         "backend": args.backend,
         "model": getattr(embedder, "model_key", None),
-        "index": index_name,
+        "collection": collection_name,
+        "search_index": search_index_name,
         "namespace": namespace,
         "dimension": dim,
         "embedded": ok,
         "failed": failed,
-        "index_total_vectors": stats.get("total_vector_count", 0),
+        "collection_total_vectors": stats.get("total_vector_count", 0),
     }, indent=2))
     return 0
 
@@ -222,9 +202,10 @@ def main() -> None:
                    choices=["gemini", "openclip"])
     p.add_argument("--source", default="csv", choices=["csv", "folder", "urls"])
     p.add_argument("--path", default=None, help="CSV/URLs file or image folder path")
-    p.add_argument("--index", default=None, help="Pinecone index name (created if missing)")
+    p.add_argument("--collection", default=None, help="MongoDB collection name (created if missing)")
+    p.add_argument("--index-name", default=None, help="Atlas Vector Search index name")
     p.add_argument("--namespace", default=None)
-    p.add_argument("--dim", type=int, default=None, help="Embedding + index dimension")
+    p.add_argument("--dim", type=int, default=None, help="Embedding + vector index dimension")
     p.add_argument("--limit", type=int, default=0, help="Max items to ingest (0 = all)")
     p.add_argument("--batch-size", type=int, default=50)
     args = p.parse_args()

@@ -12,8 +12,6 @@ pillow
 numpy
 scikit-learn
 python-dotenv
-pinecone
-pinecone[asyncio]
 modal
 boto3
 botocore

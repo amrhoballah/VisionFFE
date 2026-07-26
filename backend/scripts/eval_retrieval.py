@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-Offline retrieval evaluation: Recall@K and MRR with optional Pinecone metadata filters.
+Offline retrieval evaluation: Recall@K and MRR with optional vector-store metadata filters.
 
 Usage (from repo root):
   cd backend && python scripts/eval_retrieval.py --manifest ../data/eval_manifest.example.json
 
-Requires .env with PINECONE_API_KEY, PINECONE_INDEX_NAME, and optionally MODEL_PRESET / CUDA.
+Requires .env with MONGODB_URL (Atlas), MONGODB_VECTOR_COLLECTION, and optionally
+MODEL_PRESET / CUDA.
 """
 
 from __future__ import annotations
@@ -50,10 +51,9 @@ def run_eval(
     multi_crop: bool,
     backend: str,
 ) -> Dict[str, Any]:
-    from pinecone import Pinecone
-
     from embedder_factory import create_embedder
-    from retrieval import pinecone_filter_search_family
+    from retrieval import vector_filter_search_family
+    from mongo_vector_store import MongoVectorIndex, get_vector_collection
 
     device = None
     if backend == "openclip":
@@ -69,9 +69,13 @@ def run_eval(
     embedder = create_embedder(device=device)
     model_preset = getattr(embedder, "model_key", preset or os.getenv("MODEL_PRESET", "balanced"))
 
-    pc = Pinecone(api_key=os.environ["PINECONE_API_KEY"])
-    index_name = os.getenv("PINECONE_INDEX_NAME", "default")
-    index = pc.Index(index_name)
+    collection_name = os.getenv("MONGODB_VECTOR_COLLECTION", "embeddings")
+    search_index_name = os.getenv("VECTOR_SEARCH_INDEX_NAME", "vector_index")
+    dim = int(os.getenv("GEMINI_EMBED_DIM", "1536"))
+    namespace = os.getenv("VECTOR_NAMESPACE", "__default__")
+
+    collection = get_vector_collection(collection_name)
+    index = MongoVectorIndex(collection, search_index_name, dim)
 
     with open(manifest_path, encoding="utf-8") as f:
         manifest = json.load(f)
@@ -98,20 +102,18 @@ def run_eval(
         vec_list = vec.tolist() if hasattr(vec, "tolist") else list(vec)
 
         def do_query(filter_dict: Optional[Dict[str, Any]]) -> List[str]:
-            kwargs: Dict[str, Any] = {
-                "vector": vec_list,
-                "top_k": max_k,
-                "include_metadata": True,
-                "namespace": os.getenv("PINECONE_NAMESPACE", "__default__"),
-            }
-            if filter_dict is not None:
-                kwargs["filter"] = filter_dict
-            resp = index.query(**kwargs)
+            resp = index.query(
+                vector=vec_list,
+                top_k=max_k,
+                include_metadata=True,
+                filter=filter_dict,
+                namespace=namespace,
+            )
             return [m["id"] for m in (resp.get("matches") or [])]
 
         filt = None
         if not no_filter and family:
-            filt = pinecone_filter_search_family(str(family), "exact")
+            filt = vector_filter_search_family(str(family), "exact")
 
         ids_unfiltered = do_query(None)
         if no_filter:
@@ -155,8 +157,8 @@ def main() -> None:
     args = p.parse_args()
     k_list = [int(x.strip()) for x in args.k.split(",") if x.strip()]
 
-    if "PINECONE_API_KEY" not in os.environ:
-        print("ERROR: PINECONE_API_KEY not set", file=sys.stderr)
+    if not os.getenv("MONGODB_URL"):
+        print("ERROR: MONGODB_URL not set", file=sys.stderr)
         sys.exit(1)
 
     report = run_eval(

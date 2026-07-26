@@ -20,8 +20,8 @@ You need to create two Modal secrets to store your environment variables:
 ### Secret 1: `vision-api` (for existing API keys)
 ```bash
 modal secret create vision-api \
-  PINECONE_API_KEY=your_pinecone_api_key_here \
-  PINECONE_INDEX_NAME=your_index_name \
+  MONGODB_URL=mongodb+srv://user:pass@your-cluster.mongodb.net \
+  MONGODB_VECTOR_COLLECTION=embeddings \
   MODEL_PRESET=balanced \
   R2_ACCOUNT_ID=your_r2_account_id \
   R2_ACCESS_KEY_ID=your_r2_access_key \
@@ -94,7 +94,7 @@ Update your frontend configuration to use the Modal deployment URL:
    {
      "status": "online",
      "model": "loaded",
-     "pinecone": "connected",
+     "vector_db": "connected",
      "database_size": 0,
      "device": "cuda"
    }

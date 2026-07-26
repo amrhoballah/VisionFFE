@@ -1,11 +1,11 @@
 # VisionFFE API
 
-AI-powered FFE extraction and furniture image similarity search using deep learning and Pinecone vector database.
+AI-powered FFE extraction and furniture image similarity search using deep learning and MongoDB Atlas Vector Search.
 
 ## Features
 
 - 🔍 Find similar furniture images using AI
-- 🚀 Fast similarity search with Pinecone
+- 🚀 Fast similarity search with MongoDB Atlas Vector Search
 - 🎯 Multiple model presets (accuracy vs speed)
 - 📊 RESTful API with FastAPI
 - ☁️ Easy deployment to Modal with GPU support
@@ -28,8 +28,9 @@ cp .env.example .env
 
 Edit `.env`:
 ```
-PINECONE_API_KEY=your_pinecone_api_key_here
-PINECONE_REGION=us-east-1
+MONGODB_URL=mongodb+srv://user:pass@your-cluster.mongodb.net
+MONGODB_DATABASE=visionffe_auth
+MONGODB_VECTOR_COLLECTION=embeddings
 MODEL_PRESET=balanced
 ```
 
@@ -55,12 +56,13 @@ pip install modal
 modal token new
 ```
 
-### 3. Add Pinecone Secret to Modal
+### 3. Add MongoDB Secret to Modal
 
 ```bash
-modal secret create pinecone-secret \\
-  PINECONE_API_KEY=your_pinecone_api_key_here \\
-  PINECONE_REGION=us-east-1 \\
+modal secret create mongodb-secret \\
+  MONGODB_URL=mongodb+srv://user:pass@your-cluster.mongodb.net \\
+  MONGODB_DATABASE=visionffe_auth \\
+  MONGODB_VECTOR_COLLECTION=embeddings \\
   MODEL_PRESET=balanced
 ```
 
@@ -127,11 +129,13 @@ You can also set `MODEL_PRESET` to a raw OpenCLIP id, e.g. `ViT-H-14::laion2B-s3
 | Variable | Default | Meaning |
 |----------|---------|---------|
 | `SIMILARITY_THRESHOLD` | `0.35` | Minimum cosine similarity to keep a hit; `-1` disables filtering |
-| `RETRIEVAL_CANDIDATES_K` | `50` | Internal Pinecone `top_k` before re-rank / threshold / client `top_k` trim |
+| `RETRIEVAL_CANDIDATES_K` | `50` | Internal vector search `top_k` before re-rank / threshold / client `top_k` trim |
 | `RETRIEVAL_MIN_RESULTS_FALLBACK` | `2` | If fewer hits, widen filter then drop filter |
 | `RETRIEVAL_METADATA_BOOST` | `0.04` | Score boost when title/description matches family keywords |
 | `EMBEDDER_MULTI_CROP` | unset | Set to `1` / `true` to average default + center-crop embeddings |
-| `PINECONE_NAMESPACE` | `__default__` | Pinecone namespace for query/upsert |
+| `VECTOR_NAMESPACE` | `__default__` | Namespace field for query/upsert |
+| `MONGODB_VECTOR_COLLECTION` | `embeddings` | MongoDB collection storing embedding documents |
+| `VECTOR_SEARCH_INDEX_NAME` | `vector_index` | Atlas Vector Search index name on that collection |
 
 ## Offline retrieval eval
 
@@ -140,7 +144,7 @@ cd backend
 python scripts/eval_retrieval.py --manifest ../data/eval_manifest.example.json --k 1,5,10
 ```
 
-Populate `queries` with `image_url`, `relevant_ids` (Pinecone vector ids), and `search_family` for filtered-vs-unfiltered metrics. Use `--preset siglip` or `--multi-crop` to compare embedding setups.
+Populate `queries` with `image_url`, `relevant_ids` (vector document ids), and `search_family` for filtered-vs-unfiltered metrics. Use `--preset siglip` or `--multi-crop` to compare embedding setups.
 
 ## Example Usage
 
@@ -191,10 +195,10 @@ If you get OOM errors, switch to a smaller model:
 MODEL_PRESET=fast
 ```
 
-### Pinecone Connection Issues
-- Verify API key is correct
-- Check region matches your Pinecone index
-- Ensure index name is unique
+### MongoDB Atlas Vector Search Issues
+- Verify `MONGODB_URL` is correct and points at an Atlas cluster (Vector Search requires Atlas; a local/self-hosted `mongod` cannot serve `$vectorSearch` queries)
+- Confirm the Atlas Vector Search index is `queryable` (Atlas UI > Search tab, or `collection.list_search_indexes()`)
+- Ensure `GEMINI_EMBED_DIM` matches the dimension the index was created with
 
 ### Slow First Request
 Cold start on Modal takes 20-60 seconds for model loading. Subsequent requests are fast.

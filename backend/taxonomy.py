@@ -1,5 +1,5 @@
 """
-Canonical search families for vector filter alignment (Gemini + Pinecone metadata).
+Canonical search families for vector filter alignment (Gemini + vector store metadata).
 Maps retailer/catalog sub_category strings to a small controlled vocabulary.
 """
 
@@ -117,10 +117,10 @@ def map_subcategory_to_search_family(sub_category: Optional[str]) -> str:
     return "Other"
 
 
-def enrich_pinecone_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
+def enrich_vector_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Ensure Pinecone metadata includes search_family and sub_category_raw for filtering.
-    Mutates a copy of metadata (Pinecone accepts str/num/bool; stringify as needed).
+    Ensure vector store metadata includes search_family and sub_category_raw for filtering.
+    Returns a sanitized copy of metadata with values flattened to str/num/bool.
     """
     out = dict(metadata) if metadata else {}
     raw = out.get("sub_category") or out.get("subCategory") or ""

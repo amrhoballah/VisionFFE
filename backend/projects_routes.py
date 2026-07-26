@@ -13,7 +13,7 @@ from auth_dependencies import require_role_or_admin, require_search_permission
 from gemini_service import get_gemini_service
 from retrieval import (
     apply_similarity_threshold,
-    query_pinecone_with_fallback,
+    query_vector_index_with_fallback,
     rerank_matches_by_category_keywords,
     similarity_threshold,
     trim_to_top_k,
@@ -271,12 +271,12 @@ async def search_similar(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
     embedder = request.app.state.embedder
-    pinecone_index = request.app.state.pinecone_index
-    
+    vector_index = request.app.state.vector_index
+
     if embedder is None:
         raise HTTPException(status_code=500, detail="Model not loaded")
-    if pinecone_index is None:
-        raise HTTPException(status_code=500, detail="Pinecone not connected")
+    if vector_index is None:
+        raise HTTPException(status_code=500, detail="Vector database not connected")
     
     # Parse URLs if provided
     url_list = []
@@ -318,8 +318,8 @@ async def search_similar(
                     })
                     continue
 
-                matches, retrieval_debug = query_pinecone_with_fallback(
-                    pinecone_index,
+                matches, retrieval_debug = query_vector_index_with_fallback(
+                    vector_index,
                     query_embedding.tolist(),
                     category,
                     top_k,
@@ -360,7 +360,7 @@ async def search_similar(
             "success": True,
             "total_queries": total_queries,
             "results": all_results,
-            "total_database_size": pinecone_index.describe_index_stats()['total_vector_count']
+            "total_database_size": vector_index.describe_index_stats()['total_vector_count']
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")

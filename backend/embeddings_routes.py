@@ -3,8 +3,8 @@ Ad-hoc embedding upload endpoint for testing the active embedding backend.
 
 Lets an upload-permitted user POST one or more image files; each is uploaded to R2,
 embedded with the currently configured embedder (Gemini Embedding 2 by default), and
-upserted into the configured Pinecone index. Mirrors the existing `/api/upload`
-behavior but lives under `/api/embeddings` for test-focused use.
+upserted into the configured MongoDB Atlas Vector Search collection. Mirrors the
+existing `/api/upload` behavior but lives under `/api/embeddings` for test-focused use.
 """
 
 import json
@@ -24,15 +24,15 @@ async def upload_embeddings(
     metadata: Optional[str] = None,
     current_user=Depends(require_upload_permission),
 ):
-    """Upload image(s), auto-embed with the active backend, and upsert to Pinecone."""
+    """Upload image(s), auto-embed with the active backend, and upsert to MongoDB Atlas Vector Search."""
     uploader = request.app.state.uploader
-    pinecone_index = request.app.state.pinecone_index
+    vector_index = request.app.state.vector_index
     embedder = request.app.state.embedder
 
     if uploader is None:
         raise HTTPException(status_code=500, detail="Uploader service not available")
-    if pinecone_index is None:
-        raise HTTPException(status_code=500, detail="Pinecone not connected")
+    if vector_index is None:
+        raise HTTPException(status_code=500, detail="Vector database not connected")
 
     metadata_list = []
     if metadata:
@@ -49,7 +49,7 @@ async def upload_embeddings(
             if success:
                 uploaded.append(file.filename)
 
-        stats = pinecone_index.describe_index_stats()
+        stats = vector_index.describe_index_stats()
         return {
             "success": True,
             "backend": getattr(embedder, "model_key", None),

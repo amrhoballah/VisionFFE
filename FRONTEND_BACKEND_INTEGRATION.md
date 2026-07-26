@@ -63,13 +63,13 @@ Create a `.env` file in the backend directory with:
 # JWT Authentication
 JWT_SECRET_KEY=your-secret-key-change-this-in-production
 
-# MongoDB Configuration
+# MongoDB Configuration (use an Atlas cluster to also enable Vector Search)
 MONGODB_URL=mongodb://localhost:27017
 MONGODB_DATABASE=visionffe_auth
 
-# Pinecone Configuration (Optional - for image search features)
-PINECONE_API_KEY=your_pinecone_api_key_here
-PINECONE_INDEX_NAME=your_index_name
+# MongoDB Atlas Vector Search Configuration (Optional - for image search features)
+MONGODB_VECTOR_COLLECTION=embeddings
+VECTOR_SEARCH_INDEX_NAME=vector_index
 
 # Model Configuration (Optional)
 MODEL_PRESET=balanced
@@ -188,7 +188,7 @@ If MongoDB connection fails:
 ## Next Steps
 
 1. **Test the complete flow** with both frontend and backend running
-2. **Configure external services** (Pinecone, R2) if needed for full functionality
+2. **Configure external services** (MongoDB Atlas Vector Search, R2) if needed for full functionality
 3. **Add more features** like password reset, email verification, etc.
 4. **Deploy to production** with proper environment variables
 
