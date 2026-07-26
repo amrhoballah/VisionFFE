@@ -1,7 +1,6 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request, Depends, Form
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
-import torch
 from contextlib import asynccontextmanager
 import os
 import json
@@ -23,7 +22,14 @@ from auth_dependencies import require_search_permission, require_upload_permissi
 
 load_dotenv()
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# torch is only required by the OpenCLIP backend (EMBEDDER_BACKEND=openclip); the
+# default Gemini backend needs no GPU, so keep the import optional here too.
+try:
+    import torch
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+except ImportError:
+    device = "cpu"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
