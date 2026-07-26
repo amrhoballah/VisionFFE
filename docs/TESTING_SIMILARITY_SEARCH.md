@@ -5,18 +5,18 @@ This document walks through verifying taxonomy (`search_family`), retrieval (fal
 ## Prerequisites
 
 - Backend dependencies installed (`pip install -r backend/requirements.txt`).
-- Environment variables set (at least `PINECONE_API_KEY`, `PINECONE_INDEX_NAME`, `GEMINI_API_KEY`, R2 vars if you test upload). Optional tuning: `SIMILARITY_THRESHOLD`, `RETRIEVAL_CANDIDATES_K`, `EMBEDDER_MULTI_CROP`, `PINECONE_NAMESPACE`.
-- Pinecone index dimension must match the embedder output (e.g. after changing `MODEL_PRESET`, recreate the index or use a matching index).
+- Environment variables set (at least `MONGODB_URL` pointed at an Atlas cluster, `MONGODB_VECTOR_COLLECTION`, `GEMINI_API_KEY`, R2 vars if you test upload). Optional tuning: `SIMILARITY_THRESHOLD`, `RETRIEVAL_CANDIDATES_K`, `EMBEDDER_MULTI_CROP`, `VECTOR_NAMESPACE`, `VECTOR_SEARCH_INDEX_NAME`.
+- The Atlas Vector Search index dimension must match the embedder output (e.g. after changing `MODEL_PRESET`, recreate the index or use a matching collection).
 
 ---
 
 ## 1. Smoke-test the backend
 
 1. Start the API (from `backend/`): `uvicorn main:app --host 0.0.0.0 --port 8080` (or your usual command).
-2. Open `GET /` and confirm `"model": "loaded"` and Pinecone connected.
+2. Open `GET /` and confirm `"model": "loaded"` and `"vector_db": "connected"`.
 3. Check logs for: `Resolved OpenCLIP profile: ...` and no embedder startup errors.
 
-**Pass criteria:** App starts; embedder and Pinecone initialize.
+**Pass criteria:** App starts; embedder and MongoDB Atlas Vector Search initialize.
 
 ---
 
@@ -26,11 +26,11 @@ From `backend/`:
 
 ```bash
 python3 -c "
-from taxonomy import map_subcategory_to_search_family, enrich_pinecone_metadata
+from taxonomy import map_subcategory_to_search_family, enrich_vector_metadata
 assert map_subcategory_to_search_family('Sofas & Sectionals') == 'Sofas'
 assert map_subcategory_to_search_family('End & Side Tables') == 'Side Tables'
 assert map_subcategory_to_search_family('Accent & Arm Chairs') == 'Arm Chairs'
-m = enrich_pinecone_metadata({'sub_category': 'Coffee Tables', 'title': 'Foo'})
+m = enrich_vector_metadata({'sub_category': 'Coffee Tables', 'title': 'Foo'})
 assert m['search_family'] == 'Coffee Tables'
 assert m['sub_category_raw'] == 'Coffee Tables'
 print('taxonomy OK')
@@ -41,13 +41,13 @@ print('taxonomy OK')
 
 ---
 
-## 3. Catalog upload and Pinecone metadata
+## 3. Catalog upload and vector document metadata
 
 1. Call `POST /api/upload` with auth as a user who has upload permission, attaching at least one furniture image and JSON `metadata` per file, for example:
 
    - `sub_category`: `Sofas & Sectionals` (retailer-style label).
 
-2. In Pinecone console (or a small script), fetch one vector by id and inspect **metadata**.
+2. In the MongoDB Atlas console (or `mongosh`), fetch one document by `_id` from the vector collection and inspect **metadata**.
 
 **Pass criteria:**
 
@@ -91,7 +91,7 @@ print('taxonomy OK')
 ## 6. Offline eval script
 
 1. Copy `data/eval_manifest.example.json` to a working manifest (e.g. `eval_manifest.json`).
-2. Add at least one real `queries[]` entry: `image_url` (publicly fetchable), `relevant_ids` (Pinecone vector ids you know are correct), `search_family` (must match Gemini’s five labels for filtered run).
+2. Add at least one real `queries[]` entry: `image_url` (publicly fetchable), `relevant_ids` (vector document ids you know are correct), `search_family` (must match Gemini’s five labels for filtered run).
 3. From `backend/`:
 
    ```bash
@@ -139,7 +139,7 @@ If most vectors were indexed **before** `search_family` existed:
 
 | Step | What you verify |
 |------|------------------|
-| Startup | Embedder + Pinecone OK |
+| Startup | Embedder + MongoDB Atlas Vector Search OK |
 | Taxonomy script | Mapping + enrich fields |
 | Upload | Metadata has `search_family` |
 | Search | Results + optional `search_debug` |
@@ -147,6 +147,6 @@ If most vectors were indexed **before** `search_family` existed:
 | Eval script | Recall/MRR with real manifest |
 | Multi-crop | Optional quality check |
 | UI | Extract → search still works |
-| Migration | Old index rows updated |
+| Migration | Old collection rows updated |
 
-If something fails, capture: `MODEL_PRESET`, index dimension from `GET /api/database/stats`, one redacted `search_debug` payload, and a sample vector’s metadata from Pinecone.
+If something fails, capture: `MODEL_PRESET`, index dimension from `GET /api/database/stats`, one redacted `search_debug` payload, and a sample document's metadata from the MongoDB vector collection.

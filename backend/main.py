@@ -1,16 +1,13 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request, Depends, Form
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
-import torch
 from contextlib import asynccontextmanager
 import os
 import json
-from pinecone import Pinecone
 from dotenv import load_dotenv
-from image_embedder import ImageEmbedder
-from image_embedder2 import ImageEmbedder2
-from image_embedder3 import ImageEmbedder3
+from embedder_factory import create_embedder
 from image_uploader import ImageUploader
+from mongo_vector_store import MongoVectorIndex, ensure_vector_index, get_vector_collection
 import boto3
 
 # Authentication imports
@@ -18,13 +15,21 @@ from database import init_database, init_default_data, close_database
 from auth_routes import router as auth_router
 from admin_routes import router as admin_router
 from projects_routes import router as projects_router
+from embeddings_routes import router as embeddings_router
 # from gemini_routes import router as gemini_router
 from auth_dependencies import require_search_permission, require_upload_permission, require_stats_permission
 
 
 load_dotenv()
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# torch is only required by the OpenCLIP backend (EMBEDDER_BACKEND=openclip); the
+# default Gemini backend needs no GPU, so keep the import optional here too.
+try:
+    import torch
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+except ImportError:
+    device = "cpu"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -43,38 +48,37 @@ async def lifespan(app: FastAPI):
         return
 
     # --- Initialize Embedder ---
+    # Backend selected via EMBEDDER_BACKEND (default "gemini" = Gemini Embedding 2, no GPU).
+    # NOTE: switching backends changes the vector space AND dimension, so MONGODB_VECTOR_COLLECTION
+    # must point at a collection that matches the active backend (re-embed the catalog per backend).
     print("🔧 Initializing embedder model...")
+    app.state.embedder = None
     try:
-        model_preset = os.getenv("MODEL_PRESET", "balanced")
-        app.state.embedder = ImageEmbedder3(preset=model_preset, device=device)
-        print(f"✅ Embedder loaded with preset: {model_preset}")
+        app.state.embedder = create_embedder(device=device)
+        backend = os.getenv("EMBEDDER_BACKEND", "gemini")
+        print(f"✅ Embedder loaded (backend: {backend})")
         if hasattr(app.state.embedder, "model_key"):
-            print(f"   Resolved OpenCLIP profile: {app.state.embedder.model_key}")
+            print(f"   Resolved embedding profile: {app.state.embedder.model_key}")
     except Exception as e:
         print(f"⚠️ Warning: Could not load embedder: {e}")
         print("   App will work but image search/upload may fail")
 
-    # --- Initialize Pinecone ---
-    print("🔍 Initializing Pinecone...")
-    pinecone_api_key = os.getenv("PINECONE_API_KEY")
-    pinecone_index_name = os.getenv("PINECONE_INDEX_NAME", "default")
-    
-    if not pinecone_api_key:
-        print("⚠️ WARNING: PINECONE_API_KEY not found!")
-    else:
-        try:
-            pc = Pinecone(api_key=pinecone_api_key)
-            
-            # Check if index exists
-            if pinecone_index_name not in pc.list_indexes().names():
-                print(f"⚠️ Warning: Index '{pinecone_index_name}' does not exist in Pinecone")
-            else:
-                app.state.pinecone = pc
-                app.state.pinecone_index = pc.Index(pinecone_index_name)
-                stats = app.state.pinecone_index.describe_index_stats()
-                print(f"✅ Connected to Pinecone. Vectors: {stats['total_vector_count']}")
-        except Exception as e:
-            print(f"⚠️ Error initializing Pinecone: {e}")
+    # --- Initialize MongoDB Atlas Vector Search ---
+    print("🔍 Initializing MongoDB Atlas Vector Search...")
+    app.state.vector_index = None
+    try:
+        collection_name = os.getenv("MONGODB_VECTOR_COLLECTION", "embeddings")
+        search_index_name = os.getenv("VECTOR_SEARCH_INDEX_NAME", "vector_index")
+        dim = int(os.getenv("GEMINI_EMBED_DIM", "1536"))
+
+        collection = get_vector_collection(collection_name)
+        ensure_vector_index(collection, search_index_name, dim, filter_fields=["search_family"])
+
+        app.state.vector_index = MongoVectorIndex(collection, search_index_name, dim)
+        stats = app.state.vector_index.describe_index_stats()
+        print(f"✅ Connected to MongoDB Atlas Vector Search. Vectors: {stats['total_vector_count']}")
+    except Exception as e:
+        print(f"⚠️ Error initializing MongoDB Atlas Vector Search: {e}")
 
     # --- Initialize Cloudflare R2 ---
     print("☁️  Initializing Cloudflare R2...")
@@ -96,17 +100,17 @@ async def lifespan(app: FastAPI):
             app.state.r2 = r2_client
             app.state.r2_bucket = os.getenv("R2_BUCKET_NAME")
             
-            # Only create uploader if we have embedder and pinecone_index
-            if app.state.embedder and app.state.pinecone_index:
+            # Only create uploader if we have embedder and vector_index
+            if app.state.embedder and app.state.vector_index:
                 app.state.uploader = ImageUploader(
-                    app.state.r2, 
-                    app.state.r2_bucket, 
-                    app.state.embedder, 
-                    app.state.pinecone_index
+                    app.state.r2,
+                    app.state.r2_bucket,
+                    app.state.embedder,
+                    app.state.vector_index
                 )
                 print("✅ Connected to Cloudflare R2 and created uploader")
             else:
-                print("⚠️ Skipping uploader creation: missing embedder or Pinecone")
+                print("⚠️ Skipping uploader creation: missing embedder or vector index")
     except Exception as e:
         print(f"⚠️ Error connecting to R2: {e}")
     
@@ -137,23 +141,24 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(projects_router)
+app.include_router(embeddings_router)
 # app.include_router(gemini_router)
 
 @app.get("/")
 async def root(request: Request):
     stats = None
     embedder = request.app.state.embedder
-    pinecone_index = request.app.state.pinecone_index
-    if pinecone_index:
+    vector_index = request.app.state.vector_index
+    if vector_index:
         try:
-            stats = pinecone_index.describe_index_stats()
+            stats = vector_index.describe_index_stats()
         except:
             pass
-    
+
     return {
         "status": "online",
         "model": "loaded" if embedder else "not loaded",
-        "pinecone": "connected" if pinecone_index else "not connected",
+        "vector_db": "connected" if vector_index else "not connected",
         "database_size": stats['total_vector_count'] if stats else 0,
         "device": str(device)
     }
@@ -161,19 +166,19 @@ async def root(request: Request):
 
 @app.post("/api/upload")
 async def upload_images(
-    request: Request, 
-    files: List[UploadFile] = File(...), 
+    request: Request,
+    files: List[UploadFile] = File(...),
     metadata: Optional[str] = None,
     current_user = Depends(require_upload_permission)
 ):
     uploader = request.app.state.uploader
-    pinecone_index = request.app.state.pinecone_index
-    
+    vector_index = request.app.state.vector_index
+
     if uploader is None:
         raise HTTPException(status_code=500, detail="Uploader service not available")
-    if pinecone_index is None:
-        raise HTTPException(status_code=500, detail="Pinecone not connected")
-    
+    if vector_index is None:
+        raise HTTPException(status_code=500, detail="Vector database not connected")
+
     try:
         metadata_list = []
         if metadata:
@@ -181,16 +186,16 @@ async def upload_images(
                 metadata_list = json.loads(metadata)
             except json.JSONDecodeError:
                 pass
-        
-        vectors_to_upsert = []        
+
+        vectors_to_upsert = []
         for i, file in enumerate(files):
             file_metadata = metadata_list[i] if i < len(metadata_list) else {}
             success = await uploader.add_furniture_item(file, file_metadata)
             if success:
                 vectors_to_upsert.append(file.filename)
-        
-        stats = pinecone_index.describe_index_stats()
-        
+
+        stats = vector_index.describe_index_stats()
+
         return {
             "success": True,
             "uploaded": len(vectors_to_upsert),
@@ -206,12 +211,12 @@ async def get_database_stats(
     current_user = Depends(require_stats_permission)
 ):
     embedder = request.app.state.embedder
-    pinecone_index = request.app.state.pinecone_index
-    if pinecone_index is None:
-        raise HTTPException(status_code=500, detail="Pinecone not connected")
-    
+    vector_index = request.app.state.vector_index
+    if vector_index is None:
+        raise HTTPException(status_code=500, detail="Vector database not connected")
+
     try:
-        stats = pinecone_index.describe_index_stats()
+        stats = vector_index.describe_index_stats()
         return {
             "total_images": stats['total_vector_count'],
             "dimension": stats.get('dimension', 0),

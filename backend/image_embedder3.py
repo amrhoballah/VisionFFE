@@ -63,8 +63,12 @@ class ImageEmbedder3:
             image_features = image_features / image_features.norm(dim=-1, keepdim=True)
         return image_features
 
-    def get_embedding(self, image_url, multi_crop: bool = False):
-        """Extract normalized embedding from a single image URL."""
+    def get_embedding(self, image_url, multi_crop: bool = False, **kwargs):
+        """Extract normalized embedding from a single image URL.
+
+        Extra kwargs (e.g. ``task_type`` used by the Gemini backend) are accepted
+        and ignored so the two embedders share a call signature.
+        """
         use_mc = multi_crop or (
             os.getenv("EMBEDDER_MULTI_CROP", "").lower() in ("1", "true", "yes")
         )

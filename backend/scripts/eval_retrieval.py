@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-Offline retrieval evaluation: Recall@K and MRR with optional Pinecone metadata filters.
+Offline retrieval evaluation: Recall@K and MRR with optional vector-store metadata filters.
 
 Usage (from repo root):
   cd backend && python scripts/eval_retrieval.py --manifest ../data/eval_manifest.example.json
 
-Requires .env with PINECONE_API_KEY, PINECONE_INDEX_NAME, and optionally MODEL_PRESET / CUDA.
+Requires .env with MONGODB_URL (Atlas), MONGODB_VECTOR_COLLECTION, and optionally
+MODEL_PRESET / CUDA.
 """
 
 from __future__ import annotations
@@ -48,20 +49,33 @@ def run_eval(
     preset: Optional[str],
     no_filter: bool,
     multi_crop: bool,
+    backend: str,
 ) -> Dict[str, Any]:
-    import torch
-    from pinecone import Pinecone
+    from embedder_factory import create_embedder
+    from retrieval import vector_filter_search_family
+    from mongo_vector_store import MongoVectorIndex, get_vector_collection
 
-    from image_embedder3 import ImageEmbedder3
-    from retrieval import pinecone_filter_search_family
+    device = None
+    if backend == "openclip":
+        import torch
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_preset = preset or os.getenv("MODEL_PRESET", "balanced")
-    embedder = ImageEmbedder3(preset=model_preset, device=device)
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        os.environ["EMBEDDER_BACKEND"] = "openclip"
+        if preset:
+            os.environ["MODEL_PRESET"] = preset
+    else:
+        os.environ["EMBEDDER_BACKEND"] = "gemini"
 
-    pc = Pinecone(api_key=os.environ["PINECONE_API_KEY"])
-    index_name = os.getenv("PINECONE_INDEX_NAME", "default")
-    index = pc.Index(index_name)
+    embedder = create_embedder(device=device)
+    model_preset = getattr(embedder, "model_key", preset or os.getenv("MODEL_PRESET", "balanced"))
+
+    collection_name = os.getenv("MONGODB_VECTOR_COLLECTION", "embeddings")
+    search_index_name = os.getenv("VECTOR_SEARCH_INDEX_NAME", "vector_index")
+    dim = int(os.getenv("GEMINI_EMBED_DIM", "1536"))
+    namespace = os.getenv("VECTOR_NAMESPACE", "__default__")
+
+    collection = get_vector_collection(collection_name)
+    index = MongoVectorIndex(collection, search_index_name, dim)
 
     with open(manifest_path, encoding="utf-8") as f:
         manifest = json.load(f)
@@ -88,20 +102,18 @@ def run_eval(
         vec_list = vec.tolist() if hasattr(vec, "tolist") else list(vec)
 
         def do_query(filter_dict: Optional[Dict[str, Any]]) -> List[str]:
-            kwargs: Dict[str, Any] = {
-                "vector": vec_list,
-                "top_k": max_k,
-                "include_metadata": True,
-                "namespace": os.getenv("PINECONE_NAMESPACE", "__default__"),
-            }
-            if filter_dict is not None:
-                kwargs["filter"] = filter_dict
-            resp = index.query(**kwargs)
+            resp = index.query(
+                vector=vec_list,
+                top_k=max_k,
+                include_metadata=True,
+                filter=filter_dict,
+                namespace=namespace,
+            )
             return [m["id"] for m in (resp.get("matches") or [])]
 
         filt = None
         if not no_filter and family:
-            filt = pinecone_filter_search_family(str(family), "exact")
+            filt = vector_filter_search_family(str(family), "exact")
 
         ids_unfiltered = do_query(None)
         if no_filter:
@@ -122,6 +134,7 @@ def run_eval(
     return {
         "num_manifest_queries": len(queries),
         "num_evaluated": evaluated,
+        "backend": backend,
         "model_preset": model_preset,
         "multi_crop": multi_crop,
         "no_filter_mode": no_filter,
@@ -136,14 +149,16 @@ def main() -> None:
     p = argparse.ArgumentParser(description="VisionFFE retrieval eval")
     p.add_argument("--manifest", required=True, help="Path to eval manifest JSON")
     p.add_argument("--k", default="1,5,10", help="Comma-separated K values for Recall@K")
+    p.add_argument("--backend", default=os.getenv("EMBEDDER_BACKEND", "gemini"),
+                   choices=["gemini", "openclip"], help="Embedding backend to evaluate")
     p.add_argument("--preset", default=None, help="Override MODEL_PRESET for OpenCLIP")
     p.add_argument("--no-filter", action="store_true", help="Do not apply search_family metadata filter (filtered metrics mirror unfiltered)")
     p.add_argument("--multi-crop", action="store_true", help="Use embedder multi-crop averaging")
     args = p.parse_args()
     k_list = [int(x.strip()) for x in args.k.split(",") if x.strip()]
 
-    if "PINECONE_API_KEY" not in os.environ:
-        print("ERROR: PINECONE_API_KEY not set", file=sys.stderr)
+    if not os.getenv("MONGODB_URL"):
+        print("ERROR: MONGODB_URL not set", file=sys.stderr)
         sys.exit(1)
 
     report = run_eval(
@@ -152,6 +167,7 @@ def main() -> None:
         preset=args.preset,
         no_filter=args.no_filter,
         multi_crop=args.multi_crop,
+        backend=args.backend,
     )
     print(json.dumps(report, indent=2))
 

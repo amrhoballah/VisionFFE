@@ -1,7 +1,7 @@
 import uuid
 import os
 
-from taxonomy import enrich_pinecone_metadata
+from taxonomy import enrich_vector_metadata
 
 
 class ImageUploader:
@@ -83,7 +83,7 @@ class ImageUploader:
                 print(f"Failed to get embedding for image {unique_name}")
                 return False
 
-            meta = enrich_pinecone_metadata(metadata or {})
+            meta = enrich_vector_metadata(metadata or {})
             meta["image_url"] = file_url
 
             self.index.upsert(
@@ -94,7 +94,7 @@ class ImageUploader:
                         "metadata": meta,
                     }
                 ],
-                namespace="__default__",
+                namespace=os.getenv("VECTOR_NAMESPACE", "__default__"),
             )
             return True
 

@@ -9,7 +9,7 @@ VisionFFE is an AI-powered furniture extraction and search system built with a *
   - **Database & ODM**: MongoDB with **Beanie** documents:
     - `User`, `Role`, `Permission`, `Token`, `Project`.
   - **Auth & Roles**: Custom auth + admin routes with role/permission-based guards (e.g. `require_upload_permission`, `require_stats_permission`).
-  - **Vector Search**: **Pinecone** for storing image embeddings and running similarity search.
+  - **Vector Search**: **MongoDB Atlas Vector Search** for storing image embeddings and running similarity search.
   - **Storage**: **Cloudflare R2** (S3-compatible via `boto3`) for original and processed images.
   - **Embeddings / ML**: PyTorch + `ImageEmbedder3` to turn images into vectors for search.
   - **AI Models (Gemini)**: Google **Gemini** via `google.genai` in `gemini_service.py`:
@@ -36,7 +36,7 @@ VisionFFE is an AI-powered furniture extraction and search system built with a *
 2. **Project Creation & Image Upload**
    - In `ProjectsPage` / `ExtractorApp`, the user creates or selects a project.
    - Room renders are uploaded to **`/projects/{id}/photos`** and stored in **Cloudflare R2**.
-   - **Catalog** furniture images for similarity search are ingested via **`POST /api/upload`** (admin); each image is embedded with **`ImageEmbedder3`** and upserted into **Pinecone** with metadata including **`search_family`** (mapped from `sub_category`).
+   - **Catalog** furniture images for similarity search are ingested via **`POST /api/upload`** (admin); each image is embedded with **`ImageEmbedder3`** and upserted into **MongoDB Atlas Vector Search** with metadata including **`search_family`** (mapped from `sub_category`).
 
 3. **Furniture/Decor Identification (Gemini)**
    - Frontend calls `backendGeminiService.identifyItems(images)` which hits the FastAPI Gemini route.
@@ -50,10 +50,10 @@ VisionFFE is an AI-powered furniture extraction and search system built with a *
 
 5. **Categorization & Search**
    - For single-item images, the backend calls `categorize_item_from_url` to assign a category from the fixed list.
-   - **`POST /projects/{id}/search`** embeds the query image, queries **Pinecone** with a **`search_family`** filter (aligned with catalog ingest via [`backend/taxonomy.py`](backend/taxonomy.py)), optional retrieval fallback and metadata re-ranking ([`backend/retrieval.py`](backend/retrieval.py)).
+   - **`POST /projects/{id}/search`** embeds the query image, queries **MongoDB Atlas Vector Search** with a **`search_family`** filter (aligned with catalog ingest via [`backend/taxonomy.py`](backend/taxonomy.py)), optional retrieval fallback and metadata re-ranking ([`backend/retrieval.py`](backend/retrieval.py)).
 
 6. **Admin & Stats**
    - Admin routes manage users, roles, and permissions.
    - `/api/database/stats` exposes vector index statistics (total vectors, dimensions, device, etc.), protected by `require_stats_permission`.
 
-This pipeline ties together **React + TS frontend → FastAPI backend → MongoDB/Beanie → Cloudflare R2 → ImageEmbedder + Pinecone → Gemini** to deliver furniture discovery and extraction from multi-angle room images.
+This pipeline ties together **React + TS frontend → FastAPI backend → MongoDB/Beanie → Cloudflare R2 → ImageEmbedder + MongoDB Atlas Vector Search → Gemini** to deliver furniture discovery and extraction from multi-angle room images.

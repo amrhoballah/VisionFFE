@@ -1,6 +1,9 @@
 fastapi
 uvicorn[standard]
 python-multipart
+# torch/torchvision/timm/open-clip-torch power the local OpenCLIP embedder, now kept
+# only for the eval A/B comparison (EMBEDDER_BACKEND=openclip). The default Gemini
+# Embedding 2 backend needs no GPU; these can be dropped once Gemini is confirmed.
 torch
 torchvision
 transformers==4.49.0
@@ -9,8 +12,6 @@ pillow
 numpy
 scikit-learn
 python-dotenv
-pinecone
-pinecone[asyncio]
 modal
 boto3
 botocore
