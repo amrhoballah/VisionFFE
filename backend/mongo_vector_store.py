@@ -131,6 +131,11 @@ def ensure_vector_index(
     wait: bool = True,
 ) -> None:
     """Create the Atlas Vector Search index if it doesn't already exist (idempotent)."""
+    db = collection.database
+    if collection.name not in db.list_collection_names():
+        # createSearchIndexes requires the collection to already exist.
+        db.create_collection(collection.name)
+
     existing = {idx["name"] for idx in collection.list_search_indexes()}
     if index_name in existing:
         return
